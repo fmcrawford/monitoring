@@ -4,7 +4,6 @@ import threading
 import time
 import requests
 from curl_cffi import requests as cffi_requests
-from bot import monitor_worker as monitor_2shot_worker, get_2shot_data
 
 # ... (Kode bot 2-Shot Anda seperti biasa) ...
 
