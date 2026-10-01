@@ -1,34 +1,245 @@
-from flask import Flask, render_template, jsonify
-import threading
 import time
+import threading
+import requests
+from curl_cffi import requests as cffi_requests
+from datetime import datetime
 
-# Import worker dari file 2-Shot dan M&G
-# Asumsi Anda punya file bot_2shot.py dan file baru mg_monitor.py
-from bot_2shot import monitor_2shot_worker, get_2shot_data # Ganti dengan nama fungsi asli Anda
-from mg_monitor import monitor_worker as monitor_mg_worker
+# Konfigurasi
+WEBHOOK_URL = "https://discord.com/api/webhooks/1552512118736035971/ezzci7fFs33b-G8RTO1m8vJr9vgCECtxAVFXemVGQAOEn6gj_WY8PldhlHQJd63OFAqC"
+API_URL = "https://jkt48.com/api/v1/exclusives/EX24AE/bonus?lang=id"
+CHECK_INTERVAL = 60  # Cek API setiap 60 detik (1 menit)
 
-app = Flask(__name__)
+# Daftar Pantauan Khusus
+TARGET_MEMBERS = [
+    "Grace Octaviani", 
+    "Michelle Alexandra", 
+    "Jazzlyn Trisha", 
+    "Fiony Alveria", 
+    "Indah Cahya", 
+    "Marsha Lenathea", 
+    "Nina Tutachia"
+]
 
-# --- ROUTING FLASK ---
-@app.route('/')
-def index():
-    return render_template('index.html')
+# State Tracker
+state = {
+    "last_sunday_check_date": None,
+    "last_monday_update_date": None,
+    "last_daily_summary_date": None,
+    "initial_sent": False  
+}
 
-@app.route('/api/status')
-def api_status():
-    # Mengambil data dari variabel global bot 2-shot Anda
-    return jsonify(get_2shot_data())
+def fetch_jkt48_api():
+    """Mengambil data dari API JKT48 dengan bypass WAF."""
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer": "https://jkt48.com/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
+    try:
+        response = cffi_requests.get(
+            API_URL, 
+            impersonate="chrome120", 
+            headers=headers,
+            timeout=15
+        )
+        
+        if response.status_code == 200:
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ✅ Berhasil fetch data API!")
+            return response.json()
+        else:
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ❌ Gagal fetch API, Status: {response.status_code}")
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ❌ Error koneksi API: {e}")
+        
+    return None
 
-# --- RUNNING BACKGROUND THREADS & SERVER ---
-if __name__ == '__main__':
-    # 1. Jalankan Bot 2-Shot di background
-    thread_2shot = threading.Thread(target=monitor_2shot_worker, daemon=True)
-    thread_2shot.start()
+def process_member_quotas(api_data):
+    """Agregasi total kuota tiket serta mencatat detail sesi & jalur yang masih tersedia."""
+    member_status = {}
+    
+    if not api_data or "data" not in api_data:
+        return member_status
 
-    # 2. Jalankan Bot M&G di background
-    thread_mg = threading.Thread(target=monitor_mg_worker, daemon=True)
-    thread_mg.start()
+    for session in api_data["data"]:
+        session_label = session.get("label", "Unknown Sesi")
+        for member in session.get("session_members", []):
+            name = member["member_name"]
+            quota = member["available_quota"]
+            lane = member["label"] # Menyimpan informasi "Jalur X"
+            
+            if name not in member_status:
+                member_status[name] = {"total_quota": 0, "available_sessions": []}
+            
+            member_status[name]["total_quota"] += quota
+            
+            # Hanya catat sesi & jalur jika tiketnya masih ada (> 0)
+            if quota > 0:
+                member_status[name]["available_sessions"].append(f"{session_label} - {lane} ({quota} tiket)")
+            
+    # Sort member berdasarkan sisa tiket terbanyak ke terdikit
+    sorted_members = dict(sorted(member_status.items(), key=lambda item: item[1]["total_quota"], reverse=True))
+    return sorted_members
 
-    print("Memulai Web Server dan Bot Monitor...")
-    # Jalankan Flask Server. Gunakan host 0.0.0.0 agar bisa diakses eksternal saat di-deploy
-    app.run(host='0.0.0.0', port=5000)
+def send_discord_notification(title, description, color, fields=None):
+    """Fungsi helper untuk kirim embed ke Discord."""
+    embed = {
+        "title": title,
+        "description": description,
+        "color": color,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    if fields:
+        embed["fields"] = fields
+
+    payload = {"embeds": [embed]}
+    try:
+        res = requests.post(WEBHOOK_URL, json=payload, timeout=10)
+        if res.status_code in [200, 204]:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Webhook Discord berhasil terkirim!")
+        else:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] ⚠️ Gagal kirim Webhook, Status: {res.status_code}")
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] ❌ Error webhook: {e}")
+
+def get_target_member_details(member_status):
+    """Format teks detail sisa tiket beserta sesi dan jalur untuk member pantauan."""
+    target_details = []
+    for name in TARGET_MEMBERS:
+        if name in member_status:
+            quota = member_status[name]['total_quota']
+            if quota == 0:
+                status_text = "🔥 **Sold Out** *(Berhak Tambahan Sesi)*"
+            else:
+                # Gabungkan list sesi dan jalur yang masih tersedia
+                sessions_left = "\n   ↳ ".join(member_status[name]['available_sessions'])
+                status_text = f"🎟️ Sisa **{quota}** tiket\n   ↳ {sessions_left}"
+            target_details.append(f"• **{name}**: {status_text}")
+    return "\n".join(target_details) if target_details else "Tidak ada data."
+
+def get_eligible_members_list(member_status):
+    """Mendapatkan daftar member yang sold out (berhak mendapat sesi tambahan)."""
+    eligible = [name for name, data in member_status.items() if data['total_quota'] == 0]
+    if not eligible:
+        return "Belum ada member yang Sold Out."
+    
+    # Sortir alfabetis agar rapi
+    eligible.sort()
+    return ", ".join(eligible)
+
+def build_standard_fields(member_status):
+    """Membangun field standar (Total Status, Pantauan Khusus, Kandidat Tambahan)."""
+    sold_out_count = sum(1 for data in member_status.values() if data['total_quota'] == 0)
+    available_count = sum(1 for data in member_status.values() if data['total_quota'] > 0)
+
+    fields = [
+        {
+            "name": "📊 Status Keseluruhan",
+            "value": f"Member Tiket Tersedia: **{available_count}**\nMember Sold Out: **{sold_out_count}**",
+            "inline": False
+        },
+        {
+            "name": "🎯 Pantauan Khusus (Sesi & Jalur)",
+            "value": get_target_member_details(member_status),
+            "inline": False
+        },
+        {
+            "name": "🌟 Kandidat Tambahan Sesi (Sold Out)",
+            "value": get_eligible_members_list(member_status),
+            "inline": False
+        }
+    ]
+    return fields
+
+def send_startup_summary(member_status):
+    """Mengirim ringkasan awal saat skrip baru dijalankan."""
+    send_discord_notification(
+        title="🟢 Monitoring M&G Aktif!",
+        description="Skrip berhasil terhubung ke API JKT48.",
+        color=3066993, # Hijau
+        fields=build_standard_fields(member_status)
+    )
+
+def check_sunday_extra_session(member_status, now):
+    """Notifikasi Alert Hari Minggu jam 12:00 untuk sesi tambahan."""
+    current_date = now.strftime("%Y-%m-%d")
+    if state["last_sunday_check_date"] == current_date:
+        return
+
+    eligible_members = [name for name, data in member_status.items() if data["total_quota"] == 0]
+
+    if eligible_members:
+        eligible_members.sort()
+        desc = "**Member yang telah memenuhi syarat (Sold Out semua sesi) minggu ini:**\n\n"
+        desc += "\n".join([f"⭐ **{name}**" for name in eligible_members])
+        send_discord_notification(
+            title="🎯 FINAL: Kualifikasi Tambahan Sesi M&G",
+            description=desc,
+            color=16711680 # Merah
+        )
+    else:
+        send_discord_notification(
+            title="🎯 FINAL: Evaluasi Tambahan Sesi",
+            description="Belum ada member yang *Sold Out* di semua sesinya minggu ini.",
+            color=8421504 # Abu-abu
+        )
+    
+    state["last_sunday_check_date"] = current_date
+
+def handle_monday_api_update(member_status, now):
+    """Logic update hari Senin jam 19:00: Notifikasi sesi baru."""
+    current_date = now.strftime("%Y-%m-%d")
+    if state["last_monday_update_date"] == current_date:
+        return
+
+    send_discord_notification(
+        title="🔄 UPDATE SESI BARU M&G (Senin 19:00)",
+        description="API telah memunculkan ketersediaan jadwal/sesi baru!\nBerikut update ketersediaannya:",
+        color=16766720, # Kuning/Oranye
+        fields=build_standard_fields(member_status)
+    )
+    state["last_monday_update_date"] = current_date
+
+def send_daily_summary(member_status, now):
+    """Mengirim rangkuman sisa tiket tiap jam 08:00 pagi."""
+    current_date = now.strftime("%Y-%m-%d")
+    if state["last_daily_summary_date"] == current_date:
+        return
+
+    send_discord_notification(
+        title="📊 Daily Summary Tiket M&G",
+        description="Rangkuman status tiket harian.",
+        color=3447003, # Biru
+        fields=build_standard_fields(member_status)
+    )
+    state["last_daily_summary_date"] = current_date
+
+def monitor_worker():
+    """Fungsi utama monitoring."""
+    print("Mulai memonitor API JKT48...")
+    while True:
+        now = datetime.now()
+        api_data = fetch_jkt48_api()
+        
+        if api_data:
+            member_status = process_member_quotas(api_data)
+            
+            # Kirim notifikasi pertama kali saat skrip dinyalakan
+            if not state["initial_sent"]:
+                send_startup_summary(member_status)
+                state["initial_sent"] = True
+
+            # 1. Cek Syarat Tambahan Sesi: Tiap Minggu, Jam 12:00 ke atas
+            if now.weekday() == 6 and now.hour >= 12:
+                check_sunday_extra_session(member_status, now)
+                
+            # 2. Cek Update Penambahan Sesi Baru: Tiap Senin, Jam 19:00 ke atas
+            if now.weekday() == 0 and now.hour >= 19:
+                handle_monday_api_update(member_status, now)
+                
+            # 3. Daily summary tiap jam 08:00
+            if now.hour == 8:
+                send_daily_summary(member_status, now)
+
+        time.sleep(CHECK_INTERVAL)
