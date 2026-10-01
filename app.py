@@ -9,6 +9,9 @@ from mg_monitor import monitor_worker as monitor_mg_worker, get_mg_data
 # 1. Inisialisasi Flask (harus ditaruh sebelum dekorator route)
 app = Flask(__name__)
 
+def get_mg_data():
+    return LATEST_STATUS_MG
+
 # --- BACKGROUND THREADS ---
 # Dijalankan di luar `if __name__ == '__main__':` agar thread tetap berjalan saat di-deploy pakai Gunicorn
 def start_background_threads():
