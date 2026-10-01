@@ -1,7 +1,43 @@
-import time
+from flask import Flask, jsonify
+from flask_cors import CORS
 import threading
+import time
 import requests
 from curl_cffi import requests as cffi_requests
+
+# ... (Kode bot 2-Shot Anda seperti biasa) ...
+
+app = Flask(__name__)
+CORS(app) # Mengizinkan UI dari port/domain lain memanggil API ini
+
+@app.route('/api/status')
+def get_status():
+    return jsonify(LATEST_STATUS)
+
+if __name__ == '__main__':
+    # Jalankan thread pemantau 2-Shot
+    t = threading.Thread(target=main_loop, daemon=True)
+    t.start()
+    
+    # Jalankan server API 2-Shot di port 5001
+    app.run(host='0.0.0.0', port=5001)
+
+# ... (Kode bot 2-Shot Anda seperti biasa) ...
+
+app = Flask(__name__)
+CORS(app) # Mengizinkan UI dari port/domain lain memanggil API ini
+
+@app.route('/api/status')
+def get_status():
+    return jsonify(LATEST_STATUS)
+
+if __name__ == '__main__':
+    # Jalankan thread pemantau 2-Shot
+    t = threading.Thread(target=main_loop, daemon=True)
+    t.start()
+    
+    # Jalankan server API 2-Shot di port 5001
+    app.run(host='0.0.0.0', port=5001)
 
 # ==========================================
 # KONFIGURASI BOT
