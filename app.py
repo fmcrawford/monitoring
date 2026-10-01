@@ -1,53 +1,31 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, jsonify
+from flask_cors import CORS
 import threading
-import os
 
-# Import fungsi worker dan data dari bot.py (2-Shot) & mg_monitor.py (M&G)
-from bot import monitor_2shot_worker, get_2shot_data
+# Import bot 2-Shot (sesuaikan nama file 2-Shot Anda, misal: twoshot_monitor.py)
+from twoshot_monitor import monitor_worker as monitor_2shot_worker, get_2shot_data
+
+# Import bot M&G
 from mg_monitor import monitor_worker as monitor_mg_worker, get_mg_data
 
-# 1. Inisialisasi Flask (harus ditaruh sebelum dekorator route)
 app = Flask(__name__)
+CORS(app)
 
-# Contoh penambahan route di app.py
-@app.route('/api/mg')
-def api_mg():
-    return jsonify(get_mg_data())
-
-def get_mg_data():
-    return LATEST_STATUS_MG
-
-# --- BACKGROUND THREADS ---
-# Dijalankan di luar `if __name__ == '__main__':` agar thread tetap berjalan saat di-deploy pakai Gunicorn
-def start_background_threads():
-    # Thread 2-Shot
-    thread_2shot = threading.Thread(target=monitor_2shot_worker, daemon=True)
-    thread_2shot.start()
-
-    # Thread M&G
-    thread_mg = threading.Thread(target=monitor_mg_worker, daemon=True)
-    thread_mg.start()
-
-# Jalankan thread pemantau saat file diimpor/dimuat
-start_background_threads()
-
-
-# --- ROUTING FLASK ---
-@app.route('/')
-def index():
-    return render_template('index.html')
-
+# Endpoint untuk 2-Shot (EX5B99)
 @app.route('/api/status')
-def api_status():
-    """Endpoint status untuk 2-Shot"""
+def get_status_2shot():
     return jsonify(get_2shot_data())
 
-@app.route('/api/status_mg')
-def api_status_mg():
-    """Endpoint status untuk Meet & Greet"""
+# Endpoint baru untuk M&G (EX24AE)
+@app.route('/api/mg')
+def get_status_mg():
     return jsonify(get_mg_data())
 
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+if __name__ == "__main__":
+    # Jalankan bot 2-Shot di background
+    threading.Thread(target=monitor_2shot_worker, daemon=True).start()
+    
+    # Jalankan bot M&G di background
+    threading.Thread(target=monitor_mg_worker, daemon=True).start()
+    
+    app.run(host="0.0.0.0", port=5000)
