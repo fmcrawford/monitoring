@@ -26,6 +26,13 @@ TARGET_MEMBERS = [
     "Nina Tutachia"
 ]
 
+# Di dalam mg_monitor.py
+LATEST_STATUS_MG = {
+    "last_check": 0,
+    "total_quota": 0,
+    "members": []
+}
+
 # State Tracker
 state = {
     "last_sunday_check_date": None,
