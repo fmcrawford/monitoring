@@ -9,6 +9,11 @@ from mg_monitor import monitor_worker as monitor_mg_worker, get_mg_data
 # 1. Inisialisasi Flask (harus ditaruh sebelum dekorator route)
 app = Flask(__name__)
 
+# Contoh penambahan route di app.py
+@app.route('/api/mg')
+def api_mg():
+    return jsonify(get_mg_data())
+
 def get_mg_data():
     return LATEST_STATUS_MG
 
