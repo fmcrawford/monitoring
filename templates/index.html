@@ -4,18 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JKT48 Event Monitor</title>
-    <!-- Menggunakan Bootstrap untuk UI yang rapi -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #121212; color: #ffffff; padding-top: 2rem; }
-        .sold-out { color: #dc3545; font-weight: bold; }
-        .available { color: #198754; font-weight: bold; }
-        .table-dark { --bs-table-bg: #1e1e1e; }
+        body { background-color: #121212; color: #ffffff; padding-top: 2rem; padding-bottom: 2rem; }
+        /* Styling tambahan agar Accordion cocok dengan tema gelap */
+        .accordion-button { background-color: #2b2b2b !important; color: white !important; box-shadow: none !important; }
+        .accordion-button:not(.collapsed) { background-color: #dc3545 !important; color: white !important; }
+        .accordion-button::after { filter: invert(1); }
+        .table-dark { --bs-table-bg: #1e1e1e; margin-bottom: 0; }
     </style>
 </head>
 <body>
 
-<div class="container">
+<div class="container" style="max-width: 800px;">
     <h2 class="text-center mb-4">🎫 JKT48 Ticket Monitor</h2>
 
     <!-- Tombol Kategori -->
@@ -30,33 +31,21 @@
         <small class="text-muted">Pembaruan Terakhir: <span id="last-update">-</span></small>
     </div>
 
-    <!-- Tabel Data -->
-    <div class="table-responsive">
-        <table class="table table-dark table-striped table-hover align-middle text-center">
-            <thead>
-                <tr>
-                    <th>Nama Member</th>
-                    <th>Sesi</th>
-                    <th>Jalur</th>
-                    <th>Status Kuota</th>
-                </tr>
-            </thead>
-            <tbody id="table-body">
-                <tr><td colspan="4">Memuat data...</td></tr>
-            </tbody>
-        </table>
+    <!-- Tempat Data Accordion -->
+    <div class="accordion" id="data-container">
+        <div class="text-center py-4">Memuat data...</div>
     </div>
 </div>
+
+<!-- Wajib ditambahkan agar fitur klik (collapse) berfungsi -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     let currentCategory = '2shot';
     let fetchInterval;
 
-    // Fungsi untuk ganti kategori saat tombol diklik
     function switchCategory(category) {
         currentCategory = category;
-        
-        // Ubah tampilan tombol aktif
         const btn2shot = document.getElementById('btn-2shot');
         const btnMg = document.getElementById('btn-mg');
         
@@ -68,71 +57,102 @@
             btnMg.className = 'btn btn-danger active';
         }
 
-        // Tampilkan loading & ambil data baru
-        document.getElementById('table-body').innerHTML = '<tr><td colspan="4">Memuat data...</td></tr>';
+        document.getElementById('data-container').innerHTML = '<div class="text-center py-4">Memuat data...</div>';
         fetchData();
     }
 
-    // Fungsi utama mengambil data dari Backend
     async function fetchData() {
-        // Tentukan endpoint berdasarkan kategori yang dipilih
         const endpoint = currentCategory === '2shot' ? '/api/status' : '/api/status_mg';
-        
         try {
             const response = await fetch(endpoint);
             const data = await response.json();
-            renderTable(data);
+            renderData(data);
         } catch (error) {
-            console.error("Gagal mengambil data:", error);
-            document.getElementById('table-body').innerHTML = '<tr><td colspan="4" class="text-danger">Gagal terhubung ke server.</td></tr>';
+            console.error("Error:", error);
+            document.getElementById('data-container').innerHTML = '<div class="text-center py-4 text-danger">Gagal terhubung ke server.</div>';
         }
     }
 
-    // Fungsi merender data JSON ke dalam Tabel HTML
-    function renderTable(data) {
-        // Update Info Header
+    function renderData(data) {
         document.getElementById('total-quota').innerText = data.total_quota || 0;
-        
         if (data.last_check) {
             const date = new Date(data.last_check * 1000);
             document.getElementById('last-update').innerText = date.toLocaleTimeString('id-ID');
         }
 
-        const tbody = document.getElementById('table-body');
-        tbody.innerHTML = ''; // Bersihkan tabel
-
+        const container = document.getElementById('data-container');
+        
         if (!data.members || data.members.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4">Belum ada data tiket yang dipantau.</td></tr>';
+            container.innerHTML = '<div class="text-center py-4">Belum ada data (atau data sedang diproses bot).</div>';
             return;
         }
 
-        // Render seluruh member (baik yang tersedia maupun sold out)
-        data.members.forEach(member => {
-            const isSoldOut = member.quota === 0;
-            
-            // Badge indikator (Merah jika Sold Out, Hijau jika tersedia)
-            const statusBadge = isSoldOut 
-                ? '<span class="badge bg-danger">Sold Out</span>' 
-                : `<span class="badge bg-success">${member.quota} Tiket</span>`;
-
-            const row = document.createElement('tr');
-            // Jika sold out, beri efek sedikit transparan agar mudah dibedakan
-            if (isSoldOut) row.style.opacity = "0.6";
-
-            row.innerHTML = `
-                <td class="fw-bold">${member.name}</td>
-                <td>${member.session}</td>
-                <td>${member.track}</td>
-                <td>${statusBadge}</td>
-            `;
-            tbody.appendChild(row);
+        // 1. Kelompokkan data berdasarkan Nama Member
+        const groupedByMember = {};
+        data.members.forEach(m => {
+            if (!groupedByMember[m.name]) {
+                groupedByMember[m.name] = { totalQuota: 0, sessions: [] };
+            }
+            groupedByMember[m.name].sessions.push(m);
+            groupedByMember[m.name].totalQuota += m.quota;
         });
+
+        // 2. Urutkan nama member sesuai alfabet
+        const sortedNames = Object.keys(groupedByMember).sort();
+
+        // 3. Buat HTML untuk Accordion
+        let accordionHTML = '';
+        sortedNames.forEach((name, index) => {
+            const memberData = groupedByMember[name];
+            const isAllSoldOut = memberData.totalQuota === 0;
+            // Buat ID aman (hapus spasi/simbol) untuk target collapse Bootstrap
+            const safeId = name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+
+            const totalBadge = isAllSoldOut 
+                ? '<span class="badge bg-secondary ms-auto">Sold Out</span>' 
+                : `<span class="badge bg-success ms-auto">${memberData.totalQuota} Tiket</span>`;
+
+            let tableRows = '';
+            memberData.sessions.forEach(s => {
+                const sessionSoldOut = s.quota === 0;
+                const statusBadge = sessionSoldOut ? '<span class="badge bg-secondary">Habis</span>' : `<span class="badge bg-success">${s.quota}</span>`;
+                tableRows += `
+                    <tr style="${sessionSoldOut ? 'opacity: 0.5;' : ''}">
+                        <td>${s.session}</td>
+                        <td>${s.track}</td>
+                        <td>${statusBadge}</td>
+                    </tr>
+                `;
+            });
+
+            accordionHTML += `
+                <div class="accordion-item border-secondary" style="background-color: #1e1e1e;">
+                    <h2 class="accordion-header" id="heading-${safeId}">
+                        <button class="accordion-button collapsed d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${safeId}">
+                            <span class="fw-bold fs-6 me-2">${name}</span> 
+                            ${totalBadge}
+                        </button>
+                    </h2>
+                    <div id="collapse-${safeId}" class="accordion-collapse collapse" data-bs-parent="#data-container">
+                        <div class="accordion-body p-0">
+                            <table class="table table-dark table-striped text-center align-middle">
+                                <thead>
+                                    <tr><th>Sesi</th><th>Jalur</th><th>Ketersediaan</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${tableRows}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = accordionHTML;
     }
 
-    // Jalankan fetch pertama kali
     fetchData();
-    
-    // Auto-refresh setiap 15 detik mengikuti interval bot
     fetchInterval = setInterval(fetchData, 15000);
 </script>
 
