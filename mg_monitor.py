@@ -4,6 +4,12 @@ import requests
 from curl_cffi import requests as cffi_requests
 from datetime import datetime
 
+# Data global untuk dikonsumsi web
+mg_web_data = {"last_check": 0, "total_quota": 0, "members": []}
+
+def get_mg_data():
+    return mg_web_data
+
 # Konfigurasi
 WEBHOOK_URL = "https://discord.com/api/webhooks/1552512118736035971/ezzci7fFs33b-G8RTO1m8vJr9vgCECtxAVFXemVGQAOEn6gj_WY8PldhlHQJd63OFAqC"
 API_URL = "https://jkt48.com/api/v1/exclusives/EX24AE/bonus?lang=id"
@@ -57,7 +63,10 @@ def fetch_jkt48_api():
 
 def process_member_quotas(api_data):
     """Agregasi total kuota tiket serta mencatat detail sesi & jalur yang masih tersedia."""
+    global mg_web_data
     member_status = {}
+    web_members = []
+    total_all_quota = 0
     
     if not api_data or "data" not in api_data:
         return member_status
@@ -67,18 +76,33 @@ def process_member_quotas(api_data):
         for member in session.get("session_members", []):
             name = member["member_name"]
             quota = member["available_quota"]
-            lane = member["label"] # Menyimpan informasi "Jalur X"
+            lane = member["label"] 
+            
+            # --- TAMBAHAN UNTUK WEB ---
+            web_members.append({
+                "name": name,
+                "session": session_label,
+                "track": lane,
+                "quota": quota
+            })
+            total_all_quota += quota
+            # --------------------------
             
             if name not in member_status:
                 member_status[name] = {"total_quota": 0, "available_sessions": []}
             
             member_status[name]["total_quota"] += quota
             
-            # Hanya catat sesi & jalur jika tiketnya masih ada (> 0)
             if quota > 0:
-                member_status[name]["available_sessions"].append(f"{session_label} - {lane} ({quota} tiket)")
+                member_status[name]["available_sessions"].append(f"{session_label}\n   ↳ {lane} ({quota} tiket)")
             
-    # Sort member berdasarkan sisa tiket terbanyak ke terdikit
+    # Update data web
+    mg_web_data = {
+        "last_check": time.time(),
+        "total_quota": total_all_quota,
+        "members": web_members
+    }
+            
     sorted_members = dict(sorted(member_status.items(), key=lambda item: item[1]["total_quota"], reverse=True))
     return sorted_members
 
