@@ -275,3 +275,6 @@ def main_loop():
             restocked_this_hour.clear()
 
         prev_state = curr_state
+
+    def get_2shot_data():
+        return LATEST_STATUS  # Sesuaikan dengan nama variabel global status 2-shot Anda
