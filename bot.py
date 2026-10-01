@@ -22,6 +22,20 @@ COLOR_GOLD = 0xF1C40F
 COLOR_BLUE = 0x3498DB
 COLOR_PURPLE = 0x9B59B6
 
+# --- VARIABEL GLOBAL UNTUK UI WEB ---
+LATEST_STATUS = {
+    "last_check": 0,
+    "total_quota": 0,
+    "members": []
+}
+
+def update_web_status(member_list):
+    global LATEST_STATUS
+    LATEST_STATUS["last_check"] = time.time()
+    LATEST_STATUS["members"] = member_list
+    LATEST_STATUS["total_quota"] = sum(m["quota"] for m in member_list)
+# ------------------------------------
+
 def send_discord_embed(title, color, description=None, fields=None, content_text=None, thumbnail_url=LOGO_URL):
     if not DISCORD_WEBHOOK_URL: 
         return
@@ -54,8 +68,8 @@ def send_discord_embed(title, color, description=None, fields=None, content_text
     def send():
         try:
             requests.post(DISCORD_WEBHOOK_URL, json=payload, timeout=10)
-        except Exception as e:
-            print(f"Error webhook: {e}")
+        except Exception:
+            pass
 
     threading.Thread(target=send).start()
 
@@ -64,8 +78,8 @@ def fetch_api():
         r = cffi_requests.get(API_URL, impersonate="chrome", timeout=15)
         if r.status_code == 200:
             return r.json()
-    except Exception as e:
-        print(f"Error fetch API: {e}")
+    except Exception:
+        pass
     return None
 
 def parse_api_data(response_json):
@@ -111,29 +125,14 @@ def main_loop():
             
     members = parse_api_data(data)
     if not members:
-        print("❌ Gagal memetakan data. Struktur JSON API mungkin berbeda.")
         return
 
+    update_web_status(members) # Update Web UI
     prev_state = {m["id"]: m for m in members}
     restocked_this_hour = {}
 
-    print("=== STATUS AWAL SELURUH MEMBER (SANITY CHECK) ===")
-    total_quota_available = 0
-    special_at_startup = []
-
-    for m in members:
-        quota_num = m["quota"]
-        total_quota_available += quota_num
-        status_text = f"✅ Sisa: {quota_num}" if quota_num > 0 else "❌ Sold Out"
-        
-        if quota_num > 0 and m["name"] in SPECIAL_TARGETS:
-            special_at_startup.append(m)
-        
-        print(f"[{status_text}] {m['name']} | {m['session']} ({m['track']})")
-        
-    print("-" * 50)
-    print(f"Total Slot Terbaca: {len(members)} | Total Tiket Tersedia: {total_quota_available}")
-    print("-" * 50)
+    total_quota_available = sum(m["quota"] for m in members)
+    special_at_startup = [m for m in members if m["quota"] > 0 and m["name"] in SPECIAL_TARGETS]
 
     if special_at_startup:
         for sp in special_at_startup:
@@ -143,12 +142,7 @@ def main_loop():
                 {"name": "Sisa Kuota", "value": f"🎫 **{sp['quota']} Tiket**", "inline": True},
                 {"name": "Akses Cepat", "value": f"⚡ [**KLIK DI SINI UNTUK BELI SEKARANG**]({EXCLUSIVE_URL})", "inline": False}
             ]
-            send_discord_embed(
-                title="🌟 STARTUP SPECIAL OSHI ALERT",
-                color=COLOR_GOLD,
-                fields=fields,
-                content_text="@everyone **Target Oshi kamu tersedia sejak bot aktif!**"
-            )
+            send_discord_embed(title="🌟 STARTUP SPECIAL OSHI ALERT", color=COLOR_GOLD, fields=fields, content_text="@everyone **Target Oshi kamu tersedia sejak bot aktif!**")
 
     available_list = [m for m in members if m["quota"] > 0]
     if available_list:
@@ -156,7 +150,6 @@ def main_loop():
         chunk_str = "\n".join(lines[:20])
         if len(lines) > 20:
             chunk_str += f"\n\n*...dan {len(lines) - 20} slot lainnya.*"
-
         fields = [
             {"name": "Ringkasan Sistem", "value": f"Total Slot Terbuka: **{len(available_list)}**\nTotal Tiket: **{total_quota_available} Tiket**", "inline": False},
             {"name": "Daftar Slot Tersedia", "value": chunk_str, "inline": False},
@@ -164,12 +157,8 @@ def main_loop():
         ]
         send_discord_embed(title="🚀 STATUS AWAL 2-SHOT JKT48", color=COLOR_GREEN, fields=fields)
     else:
-        send_discord_embed(
-            title="🚀 STATUS AWAL 2-SHOT JKT48", color=COLOR_RED,
-            description="❌ Saat ini seluruh slot tercatat **Sold Out**.\nBot akan terus memantau penambahan tiket secara real-time."
-        )
+        send_discord_embed(title="🚀 STATUS AWAL 2-SHOT JKT48", color=COLOR_RED, description="❌ Saat ini seluruh slot tercatat **Sold Out**.\nBot akan terus memantau penambahan tiket secara real-time.")
 
-    print(f"\nMemasuki fase pemantauan. Mengecek restock setiap {CHECK_INTERVAL} detik...")
     last_recap_time = time.time()
 
     while True:
@@ -183,11 +172,11 @@ def main_loop():
         if not curr_members: 
             continue
         
+        update_web_status(curr_members) # Update Web UI Realtime
         curr_state = {m["id"]: m for m in curr_members}
         
         for uid, curr_item in curr_state.items():
             prev_item = prev_state.get(uid)
-            
             if prev_item is not None:
                 prev_q = prev_item["quota"]
                 curr_q = curr_item["quota"]
@@ -206,19 +195,12 @@ def main_loop():
                     ]
 
                     if curr_item["name"] in SPECIAL_TARGETS:
-                        print(f"[{time.strftime('%H:%M:%S')}] 🌟🎉 SPECIAL RESTOCK: {curr_item['name']} (+{added_qty} Tiket | Total: {curr_q})")
-                        send_discord_embed(
-                            title="🌟🚨 SPECIAL OSHI RESTOCK ALERT! 🚨🌟",
-                            color=COLOR_GOLD, fields=fields, content_text="@everyone **OSHI KAMU BARU SAJA RESTOCK!**"
-                        )
+                        send_discord_embed(title="🌟🚨 SPECIAL OSHI RESTOCK ALERT! 🚨🌟", color=COLOR_GOLD, fields=fields, content_text="@everyone **OSHI KAMU BARU SAJA RESTOCK!**")
                     else:
-                        print(f"[{time.strftime('%H:%M:%S')}] 🎉 RESTOCK: {curr_item['name']} (+{added_qty} Tiket | Total: {curr_q})")
                         send_discord_embed(title="🚨 TICKET RESTOCK DETECTED", color=COLOR_BLUE, fields=fields)
 
         if time.time() - last_recap_time >= HOURLY_INTERVAL:
-            print(f"[{time.strftime('%H:%M:%S')}] 📊 Mengirim rekap 1 jam...")
             available_recap = [m for m in curr_members if m["quota"] > 0]
-            
             if available_recap:
                 lines = []
                 for m in available_recap:
@@ -238,15 +220,9 @@ def main_loop():
                 ]
                 send_discord_embed(title="📊 REKAP KETERSEDIAAN TIKET (1 JAM)", color=COLOR_PURPLE, fields=fields)
             else:
-                send_discord_embed(
-                    title="📊 REKAP KETERSEDIAAN TIKET (1 JAM)", color=COLOR_RED,
-                    description="❌ Saat ini seluruh kuota tiket dalam kondisi **Sold Out**."
-                )
+                send_discord_embed(title="📊 REKAP KETERSEDIAAN TIKET (1 JAM)", color=COLOR_RED, description="❌ Saat ini seluruh kuota tiket dalam kondisi **Sold Out**.")
 
             last_recap_time = time.time()
             restocked_this_hour.clear()
 
         prev_state = curr_state
-
-if __name__ == "__main__":
-    main_loop()
