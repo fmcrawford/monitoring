@@ -1,36 +1,14 @@
 import time
 import threading
 import requests
-from curl_cffi import requests as cffi_requests
 from datetime import datetime
+from curl_cffi import requests as cffi_requests
 from flask import Flask, jsonify
 from flask_cors import CORS
-import threading
 
-# ... (Kode bot M&G Anda) ...
-
-app = Flask(__name__)
-CORS(app)
-
-@app.route('/api/status')
-def get_status():
-    return jsonify(LATEST_STATUS_MG)
-
-if __name__ == '__main__':
-    # Jalankan thread pemantau M&G
-    t = threading.Thread(target=main_loop_mg, daemon=True)
-    t.start()
-    
-    # Jalankan server API M&G di port 5002
-    app.run(host='0.0.0.0', port=5002)
-
-# Data global untuk dikonsumsi web
-mg_web_data = {"last_check": 0, "total_quota": 0, "members": []}
-
-def get_mg_data():
-    return mg_web_data
-
-# Konfigurasi
+# ==========================================
+# KONFIGURASI GLOBAL
+# ==========================================
 WEBHOOK_URL = "https://discord.com/api/webhooks/1552512118736035971/ezzci7fFs33b-G8RTO1m8vJr9vgCECtxAVFXemVGQAOEn6gj_WY8PldhlHQJd63OFAqC"
 API_URL = "https://jkt48.com/api/v1/exclusives/EX24AE/bonus?lang=id"
 CHECK_INTERVAL = 60  # Cek API setiap 60 detik (1 menit)
@@ -46,14 +24,14 @@ TARGET_MEMBERS = [
     "Nina Tutachia"
 ]
 
-# Di dalam mg_monitor.py
+# Variabel Global Status untuk UI Web & Endpoint Flask
 LATEST_STATUS_MG = {
     "last_check": 0,
     "total_quota": 0,
     "members": []
 }
 
-# State Tracker
+# State Tracker Notifikasi Discord
 state = {
     "last_sunday_check_date": None,
     "last_monday_update_date": None,
@@ -61,6 +39,16 @@ state = {
     "initial_sent": False  
 }
 
+# ==========================================
+# FUNGSI EXPORT UNTUK FLASK / APP.PY
+# ==========================================
+def get_mg_data():
+    """Mengembalikan data M&G terbaru untuk endpoint Flask / UI."""
+    return LATEST_STATUS_MG
+
+# ==========================================
+# FUNGSI PEMROSESAN DATA API
+# ==========================================
 def fetch_jkt48_api():
     """Mengambil data dari API JKT48 dengan bypass WAF."""
     headers = {
@@ -88,12 +76,31 @@ def fetch_jkt48_api():
         
     return None
 
+def update_web_status_mg(api_data):
+    """Memformat raw data API M&G agar strukturnya siap digunakan oleh UI Web."""
+    global LATEST_STATUS_MG
+    parsed_items = []
+    
+    if not api_data or "data" not in api_data:
+        return
+        
+    for session_obj in api_data["data"]:
+        session_name = session_obj.get("label", "-")
+        for detail in session_obj.get("session_members", []):
+            parsed_items.append({
+                "name": detail.get("member_name", "Unknown"),
+                "session": session_name,
+                "track": detail.get("label", "-"),
+                "quota": int(detail.get("available_quota", 0))
+            })
+            
+    LATEST_STATUS_MG["last_check"] = time.time()
+    LATEST_STATUS_MG["members"] = parsed_items
+    LATEST_STATUS_MG["total_quota"] = sum(m["quota"] for m in parsed_items)
+
 def process_member_quotas(api_data):
     """Agregasi total kuota tiket serta mencatat detail sesi & jalur yang masih tersedia."""
-    global mg_web_data
     member_status = {}
-    web_members = []
-    total_all_quota = 0
     
     if not api_data or "data" not in api_data:
         return member_status
@@ -101,19 +108,9 @@ def process_member_quotas(api_data):
     for session in api_data["data"]:
         session_label = session.get("label", "Unknown Sesi")
         for member in session.get("session_members", []):
-            name = member["member_name"]
-            quota = member["available_quota"]
-            lane = member["label"] 
-            
-            # --- TAMBAHAN UNTUK WEB ---
-            web_members.append({
-                "name": name,
-                "session": session_label,
-                "track": lane,
-                "quota": quota
-            })
-            total_all_quota += quota
-            # --------------------------
+            name = member.get("member_name", "Unknown")
+            quota = int(member.get("available_quota", 0))
+            lane = member.get("label", "-") 
             
             if name not in member_status:
                 member_status[name] = {"total_quota": 0, "available_sessions": []}
@@ -123,16 +120,12 @@ def process_member_quotas(api_data):
             if quota > 0:
                 member_status[name]["available_sessions"].append(f"{session_label}\n   ↳ {lane} ({quota} tiket)")
             
-    # Update data web
-    mg_web_data = {
-        "last_check": time.time(),
-        "total_quota": total_all_quota,
-        "members": web_members
-    }
-            
     sorted_members = dict(sorted(member_status.items(), key=lambda item: item[1]["total_quota"], reverse=True))
     return sorted_members
 
+# ==========================================
+# FUNGSI HELPER DISCORD NOTIFICATION
+# ==========================================
 def send_discord_notification(title, description, color, fields=None):
     """Fungsi helper untuk kirim embed ke Discord."""
     embed = {
@@ -163,7 +156,6 @@ def get_target_member_details(member_status):
             if quota == 0:
                 status_text = "🔥 **Sold Out** *(Berhak Tambahan Sesi)*"
             else:
-                # Gabungkan list sesi dan jalur yang masih tersedia
                 sessions_left = "\n   ↳ ".join(member_status[name]['available_sessions'])
                 status_text = f"🎟️ Sisa **{quota}** tiket\n   ↳ {sessions_left}"
             target_details.append(f"• **{name}**: {status_text}")
@@ -174,8 +166,6 @@ def get_eligible_members_list(member_status):
     eligible = [name for name, data in member_status.items() if data['total_quota'] == 0]
     if not eligible:
         return "Belum ada member yang Sold Out."
-    
-    # Sortir alfabetis agar rapi
     eligible.sort()
     return ", ".join(eligible)
 
@@ -184,7 +174,7 @@ def build_standard_fields(member_status):
     sold_out_count = sum(1 for data in member_status.values() if data['total_quota'] == 0)
     available_count = sum(1 for data in member_status.values() if data['total_quota'] > 0)
 
-    fields = [
+    return [
         {
             "name": "📊 Status Keseluruhan",
             "value": f"Member Tiket Tersedia: **{available_count}**\nMember Sold Out: **{sold_out_count}**",
@@ -201,8 +191,10 @@ def build_standard_fields(member_status):
             "inline": False
         }
     ]
-    return fields
 
+# ==========================================
+# TRIGGER LOGIC NOTIFIKASI DISCORD
+# ==========================================
 def send_startup_summary(member_status):
     """Mengirim ringkasan awal saat skrip baru dijalankan."""
     send_discord_notification(
@@ -266,14 +258,21 @@ def send_daily_summary(member_status, now):
     )
     state["last_daily_summary_date"] = current_date
 
+# ==========================================
+# WORKER UTAMA (LOOP MONITORING)
+# ==========================================
 def monitor_worker():
-    """Fungsi utama monitoring."""
+    """Fungsi utama monitoring yang dipanggil oleh app.py."""
     print("Mulai memonitor API JKT48...")
     while True:
         now = datetime.now()
         api_data = fetch_jkt48_api()
         
         if api_data:
+            # Update data internal untuk Flask UI Web
+            update_web_status_mg(api_data)
+            
+            # Olah data untuk Discord Bot
             member_status = process_member_quotas(api_data)
             
             # Kirim notifikasi pertama kali saat skrip dinyalakan
@@ -295,51 +294,19 @@ def monitor_worker():
 
         time.sleep(CHECK_INTERVAL)
 
-# --- VARIABEL GLOBAL UNTUK UI WEB ---
-LATEST_STATUS_MG = {
-    "last_check": 0,
-    "total_quota": 0,
-    "members": []
-}
+# ==========================================
+# STANDALONE RUNNER (OPSIONAL)
+# ==========================================
+if __name__ == '__main__':
+    app = Flask(__name__)
+    CORS(app)
 
-def update_web_status_mg(api_data):
-    """Memformat raw data API M&G agar strukturnya sama dengan 2-Shot untuk UI."""
-    global LATEST_STATUS_MG
-    parsed_items = []
+    @app.route('/api/status')
+    def get_status():
+        return jsonify(LATEST_STATUS_MG)
+
+    # Jalankan thread pemantau M&G jika file dijalankan secara langsung
+    t = threading.Thread(target=monitor_worker, daemon=True)
+    t.start()
     
-    if not api_data or "data" not in api_data:
-        return
-        
-    for session_obj in api_data["data"]:
-        session_name = session_obj.get("label", "-")
-        for detail in session_obj.get("session_members", []):
-            parsed_items.append({
-                "name": detail.get("member_name", "Unknown"),
-                "session": session_name,
-                "track": detail.get("label", "-"),
-                "quota": int(detail.get("available_quota", 0))
-            })
-            
-    LATEST_STATUS_MG["last_check"] = time.time()
-    LATEST_STATUS_MG["members"] = parsed_items
-    LATEST_STATUS_MG["total_quota"] = sum(m["quota"] for m in parsed_items)
-
-def monitor_worker():
-    """Fungsi utama monitoring."""
-    print("Mulai memonitor API JKT48...")
-    while True:
-        now = datetime.now()
-        api_data = fetch_jkt48_api()
-        
-        if api_data:
-            # --- TAMBAHKAN BARIS INI ---
-            update_web_status_mg(api_data) 
-            # ---------------------------
-
-            member_status = process_member_quotas(api_data)
-            
-            # (Sisa kode ke bawah biarkan sama persis seperti aslinya)
-            if not state["initial_sent"]:
-
-def get_mg_data():
-    return LATEST_STATUS_MG
+    app.run(host='0.0.0.0', port=5002)
