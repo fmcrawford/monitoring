@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JKT48 Ticket Monitor</title>
+    <title>JKT48 Event Monitor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .special-spot {
@@ -13,13 +13,27 @@
         .special-spot:hover {
             box-shadow: 0 0 20px rgba(250, 204, 21, 0.6);
         }
+        .tab-active {
+            background-color: #ef4444; /* Red-500 */
+            color: white;
+            border-color: #ef4444;
+        }
+        .tab-inactive {
+            background-color: transparent;
+            color: #9ca3af; /* Gray-400 */
+            border-color: #4b5563; /* Gray-600 */
+        }
+        .tab-inactive:hover {
+            background-color: #374151;
+            color: white;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 font-sans min-h-screen pb-10">
     
     <div class="max-w-7xl mx-auto p-4 md:p-6">
         <!-- Header -->
-        <div class="flex flex-col md:flex-row justify-between items-center bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 mb-8 sticky top-4 z-10">
+        <div class="flex flex-col md:flex-row justify-between items-center bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 mb-6 sticky top-4 z-10">
             <div>
                 <h1 class="text-2xl md:text-3xl font-bold text-red-500 flex items-center gap-3">
                     🎟️ JKT48 Monitor
@@ -28,39 +42,80 @@
             </div>
             <div class="mt-4 md:mt-0 text-center md:text-right">
                 <div class="bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 inline-block">
-                    <p class="text-xs text-gray-400">Total Tiket Tersedia</p>
+                    <p class="text-xs text-gray-400">Total Tiket <span id="event-label">2-Shot</span></p>
                     <p id="total-quota" class="text-2xl font-bold text-green-400">0</p>
                 </div>
                 <p class="text-xs text-gray-500 mt-2">Update: <span id="last-update" class="text-gray-300">-</span></p>
             </div>
         </div>
 
+        <!-- TABS Pilihan Event -->
+        <div class="flex space-x-3 mb-8">
+            <button id="tab-2shot" onclick="setMode('2shot')" class="tab-active px-6 py-2.5 rounded-lg font-bold border transition-colors flex items-center gap-2">
+                📸 2-Shot
+            </button>
+            <button id="tab-mg" onclick="setMode('mg')" class="tab-inactive px-6 py-2.5 rounded-lg font-bold border transition-colors flex items-center gap-2">
+                🤝 Meet & Greet
+            </button>
+        </div>
+
         <h2 class="text-xl font-bold mb-4 text-green-400 border-b border-gray-700 pb-2">✅ Tiket Tersedia</h2>
         <div id="available-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
-            <!-- Data Tersedia Akan Masuk Sini -->
+            <!-- Data Tersedia -->
         </div>
 
         <h2 class="text-xl font-bold mb-4 text-gray-500 border-b border-gray-700 pb-2">❌ Sold Out</h2>
         <div id="soldout-container" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            <!-- Data Sold Out Akan Masuk Sini -->
+            <!-- Data Sold Out -->
         </div>
     </div>
 
     <script>
         // DAFTAR SPOT SPESIAL
         const SPECIAL_TARGETS = ["Grace Octaviani", "Michelle Alexandra", "Jazzlyn Trisha", "Fiony Alveria", "Indah Cahya", "Marsha Lenathea", "Nina Tutachia"];
-        const BUY_URL = "https://jkt48.com/purchase/exclusive?code=EX5B99"; // Sesuaikan kode event
+        
+        let currentMode = '2shot'; 
+        let activeBuyUrl = "https://jkt48.com/purchase/exclusive?code=EX5B99";
+
+        // Ganti Tab Mode
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Ubah Style Tab
+            if (mode === '2shot') {
+                document.getElementById('tab-2shot').className = "tab-active px-6 py-2.5 rounded-lg font-bold border transition-colors flex items-center gap-2";
+                document.getElementById('tab-mg').className = "tab-inactive px-6 py-2.5 rounded-lg font-bold border transition-colors flex items-center gap-2";
+                document.getElementById('event-label').innerText = "2-Shot";
+                activeBuyUrl = "https://jkt48.com/purchase/exclusive?code=EX5B99";
+            } else {
+                document.getElementById('tab-mg').className = "tab-active px-6 py-2.5 rounded-lg font-bold border transition-colors flex items-center gap-2";
+                document.getElementById('tab-2shot').className = "tab-inactive px-6 py-2.5 rounded-lg font-bold border transition-colors flex items-center gap-2";
+                document.getElementById('event-label').innerText = "M&G";
+                activeBuyUrl = "https://jkt48.com/purchase/exclusive?code=EX24AE";
+            }
+            
+            // Tampilkan loading & Tarik data langsung
+            document.getElementById('available-container').innerHTML = '<p class="text-gray-400 animate-pulse col-span-3">Memuat data...</p>';
+            fetchStatus();
+        }
 
         async function fetchStatus() {
             try {
-                const response = await fetch('/api/status');
+                // Tentukan endpoint berdasarkan tab yang aktif
+                const endpoint = currentMode === '2shot' ? '/api/status' : '/api/status_mg';
+                const response = await fetch(endpoint);
                 const data = await response.json();
                 
-                // Update Statistik
-                document.getElementById('total-quota').innerText = data.total_quota;
+                document.getElementById('total-quota').innerText = data.total_quota || 0;
                 if (data.last_check > 0) {
                     const date = new Date(data.last_check * 1000);
                     document.getElementById('last-update').innerText = date.toLocaleTimeString('id-ID');
+                }
+
+                if (!data.members || data.members.length === 0) {
+                    document.getElementById('available-container').innerHTML = '<p class="text-gray-500 col-span-3">Tidak ada data dari API.</p>';
+                    document.getElementById('soldout-container').innerHTML = '<p class="text-gray-500 col-span-5">-</p>';
+                    return;
                 }
 
                 // 1. GABUNGKAN DATA PER MEMBER
@@ -80,7 +135,7 @@
                     }
                 });
 
-                // 2. PISAHKAN DAN URUTKAN (Tersedia vs Sold Out)
+                // 2. PISAHKAN DAN URUTKAN
                 const availableMembers = [];
                 const soldOutMembers = [];
 
@@ -92,13 +147,11 @@
                     }
                 });
 
-                // Sortir Tersedia: Special Spot di atas, lalu berdasarkan sisa tiket terbanyak
                 availableMembers.sort((a, b) => {
                     if (a.isSpecial !== b.isSpecial) return a.isSpecial ? -1 : 1;
                     return b.totalQuota - a.totalQuota;
                 });
 
-                // Sortir Sold Out: Special Spot di atas, lalu alfabet
                 soldOutMembers.sort((a, b) => {
                     if (a.isSpecial !== b.isSpecial) return a.isSpecial ? -1 : 1;
                     return a.name.localeCompare(b.name);
@@ -121,7 +174,7 @@
                     availableHtml += `
                         <div class="rounded-lg p-4 transition-all duration-300 hover:-translate-y-1 ${cardStyle} flex flex-col justify-between">
                             <div>
-                                <a href="${BUY_URL}" target="_blank" class="block group">
+                                <a href="${activeBuyUrl}" target="_blank" class="block group">
                                     <h3 class="font-bold text-lg ${nameColor} group-hover:underline flex justify-between items-center">
                                         <span>${nameIcon}${m.name}</span>
                                         <span class="text-xs text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity font-normal">Beli ➔</span>
