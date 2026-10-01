@@ -101,6 +101,40 @@
             return;
         }
 
+        // Script yang sudah ada untuk memanggil 2-Shot
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+        // (Kode Anda untuk membuat tampilan/accordion 2-Shot)
+                });
+            
+            // SCRIPT BARU: Memanggil data M&G
+            fetch('/api/mg')
+                .then(response => response.json())
+                .then(data => {
+                    const mgContainer = document.getElementById('mg-container');
+                    
+                    // Cek apakah ada data
+                    if (!data || data.members.length === 0) {
+                        mgContainer.innerHTML = "<p>Data M&G belum tersedia.</p>";
+                        return;
+                    }
+            
+                    // Loop dan buat elemen tampilan (sesuaikan dengan format 2-shot Anda)
+                    let htmlContent = "";
+                    data.members.forEach(member => {
+                        htmlContent += `
+                            <div class="member-card">
+                                <h3>${member.name}</h3>
+                                <p>Sesi: ${member.session} | Jalur: ${member.track}</p>
+                                <p>Sisa Kuota: <b>${member.quota}</b></p>
+                            </div>
+                        `;
+                    });
+                    mgContainer.innerHTML = htmlContent;
+                })
+                .catch(error => console.error("Error fetching M&G:", error));
+        
         // 1. Kelompokkan data berdasarkan Nama Member
         const groupedByMember = {};
         data.members.forEach(m => {
