@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JKT48 2-Shot Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen">
+    
+    <div class="max-w-6xl mx-auto p-6">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-center bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-red-500 flex items-center gap-3">
+                    🎟️ JKT48 Ticket Monitor
+                </h1>
+                <p class="text-gray-400 mt-2 text-sm">Real-time status kuota 2-Shot Exclusive</p>
+            </div>
+            <div class="mt-4 md:mt-0 text-right">
+                <div class="bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 inline-block">
+                    <p class="text-xs text-gray-400">Total Tiket Tersedia</p>
+                    <p id="total-quota" class="text-2xl font-bold text-green-400">0</p>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Update Terakhir: <span id="last-update" class="text-gray-300">-</span></p>
+            </div>
+        </div>
+
+        <!-- Tombol Beli -->
+        <div class="mb-8 text-center">
+            <a href="https://jkt48.com/purchase/exclusive?code=EX5B99" target="_blank" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(220,38,38,0.5)] inline-block">
+                🛒 Buka Web Pembelian Official
+            </a>
+        </div>
+
+        <!-- Kategori Tersedia -->
+        <h2 class="text-xl font-bold mb-4 border-b border-gray-700 pb-2 text-green-400">✅ Tiket Tersedia</h2>
+        <div id="available-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-10">
+            <!-- Data akan diisi oleh Javascript -->
+            <p class="text-gray-500 text-sm">Memuat data...</p>
+        </div>
+
+        <!-- Kategori Sold Out -->
+        <h2 class="text-xl font-bold mb-4 border-b border-gray-700 pb-2 text-gray-500">❌ Sold Out</h2>
+        <div id="soldout-container" class="grid grid-cols-1 md:grid-cols-3 gap-3 opacity-60">
+            <!-- Data akan diisi oleh Javascript -->
+        </div>
+    </div>
+
+    <!-- Script Fetch Data Otomatis -->
+    <script>
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                // Update Header
+                document.getElementById('total-quota').innerText = data.total_quota;
+                
+                if (data.last_check > 0) {
+                    const date = new Date(data.last_check * 1000);
+                    document.getElementById('last-update').innerText = date.toLocaleTimeString('id-ID');
+                }
+
+                // Render Member Cards
+                const availableContainer = document.getElementById('available-container');
+                const soldoutContainer = document.getElementById('soldout-container');
+                
+                let availableHTML = '';
+                let soldoutHTML = '';
+
+                data.members.forEach(member => {
+                    if (member.quota > 0) {
+                        availableHTML += `
+                            <div class="bg-gray-800 rounded-lg p-4 border-l-4 border-green-500 hover:bg-gray-700 transition">
+                                <h3 class="font-bold text-lg text-white mb-1">${member.name}</h3>
+                                <p class="text-xs text-gray-400 mb-3">${member.session} • ${member.track}</p>
+                                <div class="flex justify-between items-end">
+                                    <span class="text-sm font-semibold bg-green-900/50 text-green-400 px-2 py-1 rounded">Sisa: ${member.quota}</span>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        soldoutHTML += `
+                            <div class="bg-gray-800/50 rounded-lg p-3 border-l-4 border-gray-600 flex justify-between items-center">
+                                <div>
+                                    <h3 class="font-medium text-sm text-gray-300">${member.name}</h3>
+                                    <p class="text-xs text-gray-500">${member.session}</p>
+                                </div>
+                                <span class="text-xs bg-red-900/30 text-red-400 px-2 py-1 rounded">Sold Out</span>
+                            </div>
+                        `;
+                    }
+                });
+
+                if(availableHTML === '') availableHTML = '<p class="text-gray-500 col-span-full">Saat ini tidak ada tiket yang tersedia.</p>';
+                if(soldoutHTML === '') soldoutHTML = '<p class="text-gray-500 col-span-full">Belum ada yang Sold Out.</p>';
+
+                availableContainer.innerHTML = availableHTML;
+                soldoutContainer.innerHTML = soldoutHTML;
+
+            } catch (error) {
+                console.error("Gagal mengambil data:", error);
+            }
+        }
+
+        // Panggil fungsi langsung saat halaman dibuka
+        fetchStatus();
+        
+        // Auto-refresh data setiap 5 detik tanpa reload halaman
+        setInterval(fetchStatus, 5000);
+    </script>
+</body>
+</html>
