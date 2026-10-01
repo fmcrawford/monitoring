@@ -5,8 +5,19 @@ import time
 # Import worker dari file 2-Shot dan M&G
 # Asumsi Anda punya file bot_2shot.py dan file baru mg_monitor.py
 from bot_2shot import monitor_2shot_worker, get_2shot_data # Ganti dengan nama fungsi asli Anda
-from mg_monitor import monitor_worker as monitor_mg_worker
+from mg_monitor import monitor_worker as monitor_mg_worker, get_mg_data
 
+# ... (kode lainnya) ...
+
+# Endpoint untuk 2-Shot
+@app.route('/api/status')
+def api_status():
+    return jsonify(get_2shot_data())
+
+# Endpoint Baru untuk M&G
+@app.route('/api/status_mg')
+def api_status_mg():
+    return jsonify(get_mg_data())
 app = Flask(__name__)
 
 # --- ROUTING FLASK ---
