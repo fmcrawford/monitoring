@@ -341,5 +341,5 @@ def monitor_worker():
             # (Sisa kode ke bawah biarkan sama persis seperti aslinya)
             if not state["initial_sent"]:
 
-   def get_mg_data():
+def get_mg_data():
     return LATEST_STATUS_MG
