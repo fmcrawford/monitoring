@@ -341,10 +341,6 @@ def monitor_worker():
             # (Sisa kode ke bawah biarkan sama persis seperti aslinya)
             if not state["initial_sent"]:
 
-                def get_mg_data():
+               def get_mg_data():
     """Mengembalikan data M&G terbaru untuk endpoint Flask / UI."""
     return LATEST_STATUS_MG
-
-if __name__ == "__main__":
-    monitor_thread = threading.Thread(target=monitor_worker, daemon=True)
-# ...
