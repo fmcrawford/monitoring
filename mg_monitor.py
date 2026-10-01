@@ -308,5 +308,8 @@ if __name__ == '__main__':
     # Jalankan thread pemantau M&G jika file dijalankan secara langsung
     t = threading.Thread(target=monitor_worker, daemon=True)
     t.start()
+
+def get_2shot_data():
+    return LATEST_STATUS_2SHOT  # Sesuaikan nama variabel global status 2-Shot Anda
     
     app.run(host='0.0.0.0', port=5002)
