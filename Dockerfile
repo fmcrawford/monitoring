@@ -5,7 +5,7 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Salin file requirements terlebih dahulu untuk mengoptimalkan proses build
-COPY requirements.txt .
+COPY requirement.txt .
 
 # Install semua dependensi (termasuk Flask, Gunicorn, dan curl_cffi)
 RUN pip install --no-cache-dir -r requirement.txt
