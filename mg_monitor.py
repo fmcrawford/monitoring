@@ -342,5 +342,4 @@ def monitor_worker():
             if not state["initial_sent"]:
 
                def get_mg_data():
-    """Mengembalikan data M&G terbaru untuk endpoint Flask / UI."""
     return LATEST_STATUS_MG
