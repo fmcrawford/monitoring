@@ -1,9 +1,36 @@
-from flask import Flask, jsonify
-from flask_cors import CORS
-import threading
 import time
+import threading
 import requests
+from datetime import datetime
 from curl_cffi import requests as cffi_requests
+
+# Variabel global status untuk 2-Shot
+LATEST_STATUS_2SHOT = {
+    "last_check": 0,
+    "total_quota": 0,
+    "members": []
+}
+
+def get_2shot_data():
+    """Fungsi wajib dipanggil oleh app.py untuk endpoint 2-Shot"""
+    return LATEST_STATUS_2SHOT
+
+def fetch_2shot_api():
+    # Masukkan kode fetch API 2-Shot Anda di sini (menggunakan URL EX5B99)
+    pass
+
+def monitor_worker():
+    """Fungsi wajib agar app.py bisa menjalankan thread bot 2-Shot"""
+    print("Mulai memonitor API 2-Shot JKT48...")
+    while True:
+        # Logika loop bot 2-Shot Anda di sini
+        # Jangan lupa update LATEST_STATUS_2SHOT di setiap iterasi sukses
+        
+        time.sleep(60)
+
+# (Opsional jika bot.py dijalankan terpisah, tapi aman dibiarkan)
+if __name__ == "__main__":
+    monitor_worker()
 
 # ... (Kode bot 2-Shot Anda seperti biasa) ...
 
