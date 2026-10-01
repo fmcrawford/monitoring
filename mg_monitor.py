@@ -3,6 +3,26 @@ import threading
 import requests
 from curl_cffi import requests as cffi_requests
 from datetime import datetime
+from flask import Flask, jsonify
+from flask_cors import CORS
+import threading
+
+# ... (Kode bot M&G Anda) ...
+
+app = Flask(__name__)
+CORS(app)
+
+@app.route('/api/status')
+def get_status():
+    return jsonify(LATEST_STATUS_MG)
+
+if __name__ == '__main__':
+    # Jalankan thread pemantau M&G
+    t = threading.Thread(target=main_loop_mg, daemon=True)
+    t.start()
+    
+    # Jalankan server API M&G di port 5002
+    app.run(host='0.0.0.0', port=5002)
 
 # Data global untuk dikonsumsi web
 mg_web_data = {"last_check": 0, "total_quota": 0, "members": []}
