@@ -22,6 +22,18 @@ COLOR_GOLD = 0xF1C40F
 COLOR_BLUE = 0x3498DB
 COLOR_PURPLE = 0x9B59B6
 
+# ==========================================
+# FUNGSI UNTUK DIIMPOR OLEH APP.PY
+# ==========================================
+def monitor_2shot_worker():
+    """Menjalankan loop utama bot 2-Shot."""
+    main_loop()
+
+def get_2shot_data():
+    """Mengembalikan data status terbaru untuk API/Web UI."""
+    return LATEST_STATUS
+
+
 # --- VARIABEL GLOBAL UNTUK UI WEB ---
 LATEST_STATUS = {
     "last_check": 0,
