@@ -2,3 +2,4 @@ requests
 curl_cffi
 flask
 gunicorn
+Flask-Cors
