@@ -27,19 +27,15 @@ def index():
 
 @app.route('/api/status')
 def api_status():
-    # Mengambil data dari variabel global bot 2-shot Anda
-    return jsonify(get_2shot_data())
+    return jsonify(get_status()) # Sesuaikan dengan nama fungsi di bot.py
 
-# --- RUNNING BACKGROUND THREADS & SERVER ---
 if __name__ == '__main__':
-    # 1. Jalankan Bot 2-Shot di background
-    thread_2shot = threading.Thread(target=monitor_2shot_worker, daemon=True)
+    # Thread 2-Shot
+    thread_2shot = threading.Thread(target=monitor_worker, daemon=True) # Sesuaikan
     thread_2shot.start()
 
-    # 2. Jalankan Bot M&G di background
+    # Thread M&G
     thread_mg = threading.Thread(target=monitor_mg_worker, daemon=True)
     thread_mg.start()
 
-    print("Memulai Web Server dan Bot Monitor...")
-    # Jalankan Flask Server. Gunakan host 0.0.0.0 agar bisa diakses eksternal saat di-deploy
     app.run(host='0.0.0.0', port=5000)
