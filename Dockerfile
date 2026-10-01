@@ -8,7 +8,7 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install semua dependensi (termasuk Flask, Gunicorn, dan curl_cffi)
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirement.txt
 
 # Salin seluruh file bot dan app ke dalam folder kerja
 COPY . .
