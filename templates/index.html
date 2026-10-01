@@ -1,215 +1,140 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JKT48 Event Monitor</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Menggunakan Bootstrap untuk UI yang rapi -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .special-spot {
-            box-shadow: 0 0 15px rgba(250, 204, 21, 0.3);
-            border-color: #facc15 !important;
-        }
-        .special-spot:hover {
-            box-shadow: 0 0 20px rgba(250, 204, 21, 0.6);
-        }
-        .tab-active {
-            background-color: #ef4444; /* Red-500 */
-            color: white;
-            border-color: #ef4444;
-        }
-        .tab-inactive {
-            background-color: transparent;
-            color: #9ca3af; /* Gray-400 */
-            border-color: #4b5563; /* Gray-600 */
-        }
-        .tab-inactive:hover {
-            background-color: #374151;
-            color: white;
-        }
+        body { background-color: #121212; color: #ffffff; padding-top: 2rem; }
+        .sold-out { color: #dc3545; font-weight: bold; }
+        .available { color: #198754; font-weight: bold; }
+        .table-dark { --bs-table-bg: #1e1e1e; }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 font-sans min-h-screen pb-10">
-    
-    <div class="max-w-7xl mx-auto p-4 md:p-6">
-        <!-- Header -->
-        <div class="flex flex-col md:flex-row justify-between items-center bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 mb-6 sticky top-4 z-10">
-            <div>
-                <h1 class="text-2xl md:text-3xl font-bold text-red-500 flex items-center gap-3">
-                    🎟️ JKT48 Monitor
-                </h1>
-                <p class="text-gray-400 mt-2 text-sm">Klik nama member untuk membeli tiket</p>
-            </div>
-            <div class="mt-4 md:mt-0 text-center md:text-right">
-                <div class="bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 inline-block">
-                    <p class="text-xs text-gray-400">Total Tiket <span id="event-label">2-Shot</span></p>
-                    <p id="total-quota" class="text-2xl font-bold text-green-400">0</p>
-                </div>
-                <p class="text-xs text-gray-500 mt-2">Update: <span id="last-update" class="text-gray-300">-</span></p>
-            </div>
-        </div>
+<body>
 
-        <!-- TABS Pilihan Event -->
-        <div class="flex space-x-3 mb-8">
-            <button id="tab-2shot" onclick="setMode('2shot')" class="tab-active px-6 py-2.5 rounded-lg font-bold border transition-colors flex items-center gap-2">
-                📸 2-Shot
-            </button>
-            <button id="tab-mg" onclick="setMode('mg')" class="tab-inactive px-6 py-2.5 rounded-lg font-bold border transition-colors flex items-center gap-2">
-                🤝 Meet & Greet
-            </button>
-        </div>
+<div class="container">
+    <h2 class="text-center mb-4">🎫 JKT48 Ticket Monitor</h2>
 
-        <h2 class="text-xl font-bold mb-4 text-green-400 border-b border-gray-700 pb-2">✅ Tiket Tersedia</h2>
-        <div id="available-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
-            <!-- Data Tersedia -->
-        </div>
-
-        <h2 class="text-xl font-bold mb-4 text-gray-500 border-b border-gray-700 pb-2">❌ Sold Out</h2>
-        <div id="soldout-container" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            <!-- Data Sold Out -->
-        </div>
+    <!-- Tombol Kategori -->
+    <div class="d-flex justify-content-center gap-3 mb-4">
+        <button id="btn-2shot" class="btn btn-danger active" onclick="switchCategory('2shot')">📸 2-Shot</button>
+        <button id="btn-mg" class="btn btn-outline-danger" onclick="switchCategory('mg')">🤝 Meet & Greet</button>
     </div>
 
-    <script>
-        // DAFTAR SPOT SPESIAL
-        const SPECIAL_TARGETS = ["Grace Octaviani", "Michelle Alexandra", "Jazzlyn Trisha", "Fiony Alveria", "Indah Cahya", "Marsha Lenathea", "Nina Tutachia"];
+    <!-- Info Status -->
+    <div class="alert alert-secondary text-center" role="alert">
+        Total Kuota Tersedia: <span id="total-quota" class="fw-bold fs-5 text-success">0</span> Tiket <br>
+        <small class="text-muted">Pembaruan Terakhir: <span id="last-update">-</span></small>
+    </div>
+
+    <!-- Tabel Data -->
+    <div class="table-responsive">
+        <table class="table table-dark table-striped table-hover align-middle text-center">
+            <thead>
+                <tr>
+                    <th>Nama Member</th>
+                    <th>Sesi</th>
+                    <th>Jalur</th>
+                    <th>Status Kuota</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <tr><td colspan="4">Memuat data...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let currentCategory = '2shot';
+    let fetchInterval;
+
+    // Fungsi untuk ganti kategori saat tombol diklik
+    function switchCategory(category) {
+        currentCategory = category;
         
-        let currentMode = '2shot'; 
-        let activeBuyUrl = "https://jkt48.com/purchase/exclusive?code=EX5B99";
-
-        // Ganti Tab Mode
-        function setMode(mode) {
-            currentMode = mode;
-            
-            // Ubah Style Tab
-            if (mode === '2shot') {
-                document.getElementById('tab-2shot').className = "tab-active px-6 py-2.5 rounded-lg font-bold border transition-colors flex items-center gap-2";
-                document.getElementById('tab-mg').className = "tab-inactive px-6 py-2.5 rounded-lg font-bold border transition-colors flex items-center gap-2";
-                document.getElementById('event-label').innerText = "2-Shot";
-                activeBuyUrl = "https://jkt48.com/purchase/exclusive?code=EX5B99";
-            } else {
-                document.getElementById('tab-mg').className = "tab-active px-6 py-2.5 rounded-lg font-bold border transition-colors flex items-center gap-2";
-                document.getElementById('tab-2shot').className = "tab-inactive px-6 py-2.5 rounded-lg font-bold border transition-colors flex items-center gap-2";
-                document.getElementById('event-label').innerText = "M&G";
-                activeBuyUrl = "https://jkt48.com/purchase/exclusive?code=EX24AE";
-            }
-            
-            // Tampilkan loading & Tarik data langsung
-            document.getElementById('available-container').innerHTML = '<p class="text-gray-400 animate-pulse col-span-3">Memuat data...</p>';
-            fetchStatus();
+        // Ubah tampilan tombol aktif
+        const btn2shot = document.getElementById('btn-2shot');
+        const btnMg = document.getElementById('btn-mg');
+        
+        if (category === '2shot') {
+            btn2shot.className = 'btn btn-danger active';
+            btnMg.className = 'btn btn-outline-danger';
+        } else {
+            btn2shot.className = 'btn btn-outline-danger';
+            btnMg.className = 'btn btn-danger active';
         }
 
-        async function fetchStatus() {
-            try {
-                // Tentukan endpoint berdasarkan tab yang aktif
-                const endpoint = currentMode === '2shot' ? '/api/status' : '/api/status_mg';
-                const response = await fetch(endpoint);
-                const data = await response.json();
-                
-                document.getElementById('total-quota').innerText = data.total_quota || 0;
-                if (data.last_check > 0) {
-                    const date = new Date(data.last_check * 1000);
-                    document.getElementById('last-update').innerText = date.toLocaleTimeString('id-ID');
-                }
+        // Tampilkan loading & ambil data baru
+        document.getElementById('table-body').innerHTML = '<tr><td colspan="4">Memuat data...</td></tr>';
+        fetchData();
+    }
 
-                if (!data.members || data.members.length === 0) {
-                    document.getElementById('available-container').innerHTML = '<p class="text-gray-500 col-span-3">Tidak ada data dari API.</p>';
-                    document.getElementById('soldout-container').innerHTML = '<p class="text-gray-500 col-span-5">-</p>';
-                    return;
-                }
+    // Fungsi utama mengambil data dari Backend
+    async function fetchData() {
+        // Tentukan endpoint berdasarkan kategori yang dipilih
+        const endpoint = currentCategory === '2shot' ? '/api/status' : '/api/status_mg';
+        
+        try {
+            const response = await fetch(endpoint);
+            const data = await response.json();
+            renderTable(data);
+        } catch (error) {
+            console.error("Gagal mengambil data:", error);
+            document.getElementById('table-body').innerHTML = '<tr><td colspan="4" class="text-danger">Gagal terhubung ke server.</td></tr>';
+        }
+    }
 
-                // 1. GABUNGKAN DATA PER MEMBER
-                const membersData = {};
-                data.members.forEach(m => {
-                    if (!membersData[m.name]) {
-                        membersData[m.name] = {
-                            name: m.name,
-                            totalQuota: 0,
-                            sessions: [],
-                            isSpecial: SPECIAL_TARGETS.includes(m.name)
-                        };
-                    }
-                    membersData[m.name].totalQuota += m.quota;
-                    if (m.quota > 0) {
-                        membersData[m.name].sessions.push({ session: m.session, track: m.track, quota: m.quota });
-                    }
-                });
-
-                // 2. PISAHKAN DAN URUTKAN
-                const availableMembers = [];
-                const soldOutMembers = [];
-
-                Object.values(membersData).forEach(member => {
-                    if (member.totalQuota > 0) {
-                        availableMembers.push(member);
-                    } else {
-                        soldOutMembers.push(member);
-                    }
-                });
-
-                availableMembers.sort((a, b) => {
-                    if (a.isSpecial !== b.isSpecial) return a.isSpecial ? -1 : 1;
-                    return b.totalQuota - a.totalQuota;
-                });
-
-                soldOutMembers.sort((a, b) => {
-                    if (a.isSpecial !== b.isSpecial) return a.isSpecial ? -1 : 1;
-                    return a.name.localeCompare(b.name);
-                });
-
-                // 3. RENDER HTML
-                let availableHtml = '';
-                availableMembers.forEach(m => {
-                    const cardStyle = m.isSpecial ? "special-spot border-l-4 bg-gray-800" : "border-l-4 border-green-500 bg-gray-800 hover:border-green-400";
-                    const nameColor = m.isSpecial ? "text-yellow-400" : "text-gray-100";
-                    const nameIcon = m.isSpecial ? "🌟 " : "";
-
-                    let sessionsHtml = m.sessions.map(s => 
-                        `<div class="flex justify-between items-center bg-gray-700/50 p-2 rounded mt-2">
-                            <span class="text-xs text-gray-300">${s.session} (${s.track})</span>
-                            <span class="text-xs font-bold text-green-400 bg-green-900/30 px-2 py-1 rounded">Sisa: ${s.quota}</span>
-                        </div>`
-                    ).join('');
-
-                    availableHtml += `
-                        <div class="rounded-lg p-4 transition-all duration-300 hover:-translate-y-1 ${cardStyle} flex flex-col justify-between">
-                            <div>
-                                <a href="${activeBuyUrl}" target="_blank" class="block group">
-                                    <h3 class="font-bold text-lg ${nameColor} group-hover:underline flex justify-between items-center">
-                                        <span>${nameIcon}${m.name}</span>
-                                        <span class="text-xs text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity font-normal">Beli ➔</span>
-                                    </h3>
-                                </a>
-                                <p class="text-xs text-gray-400 mb-2 mt-1">Total Tiket: ${m.totalQuota}</p>
-                            </div>
-                            <div class="space-y-1 border-t border-gray-700 pt-2 mt-2">
-                                ${sessionsHtml}
-                            </div>
-                        </div>
-                    `;
-                });
-
-                let soldoutHtml = '';
-                soldOutMembers.forEach(m => {
-                    const nameColor = m.isSpecial ? "text-yellow-500/70 font-semibold" : "text-gray-500";
-                    const nameIcon = m.isSpecial ? "🌟 " : "";
-                    soldoutHtml += `
-                        <div class="bg-gray-800/40 rounded p-3 border border-gray-700/50 flex flex-col justify-center items-center text-center">
-                            <h3 class="text-sm ${nameColor}">${nameIcon}${m.name}</h3>
-                        </div>
-                    `;
-                });
-
-                document.getElementById('available-container').innerHTML = availableHtml || '<p class="text-gray-500 col-span-3">Tidak ada tiket tersedia.</p>';
-                document.getElementById('soldout-container').innerHTML = soldoutHtml || '<p class="text-gray-500 col-span-5">Belum ada yang Sold Out.</p>';
-
-            } catch (error) {
-                console.error("Error:", error);
-            }
+    // Fungsi merender data JSON ke dalam Tabel HTML
+    function renderTable(data) {
+        // Update Info Header
+        document.getElementById('total-quota').innerText = data.total_quota || 0;
+        
+        if (data.last_check) {
+            const date = new Date(data.last_check * 1000);
+            document.getElementById('last-update').innerText = date.toLocaleTimeString('id-ID');
         }
 
-        fetchStatus();
-        setInterval(fetchStatus, 5000); // Otomatis refresh data tiap 5 detik
-    </script>
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = ''; // Bersihkan tabel
+
+        if (!data.members || data.members.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4">Belum ada data tiket yang dipantau.</td></tr>';
+            return;
+        }
+
+        // Render seluruh member (baik yang tersedia maupun sold out)
+        data.members.forEach(member => {
+            const isSoldOut = member.quota === 0;
+            
+            // Badge indikator (Merah jika Sold Out, Hijau jika tersedia)
+            const statusBadge = isSoldOut 
+                ? '<span class="badge bg-danger">Sold Out</span>' 
+                : `<span class="badge bg-success">${member.quota} Tiket</span>`;
+
+            const row = document.createElement('tr');
+            // Jika sold out, beri efek sedikit transparan agar mudah dibedakan
+            if (isSoldOut) row.style.opacity = "0.6";
+
+            row.innerHTML = `
+                <td class="fw-bold">${member.name}</td>
+                <td>${member.session}</td>
+                <td>${member.track}</td>
+                <td>${statusBadge}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    // Jalankan fetch pertama kali
+    fetchData();
+    
+    // Auto-refresh setiap 15 detik mengikuti interval bot
+    fetchInterval = setInterval(fetchData, 15000);
+</script>
+
 </body>
 </html>
