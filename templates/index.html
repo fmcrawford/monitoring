@@ -62,6 +62,20 @@
     }
 
     async function fetchData() {
+    // Panggil port 5001 untuk 2-Shot, atau port 5002 untuk M&G
+    const endpoint = currentCategory === '2shot' 
+        ? 'http://localhost:5001/api/status' 
+        : 'http://localhost:5002/api/status';
+    
+    try {
+        const response = await fetch(endpoint);
+        const data = await response.json();
+        renderData(data);
+    } catch (error) {
+        console.error("Gagal mengambil data dari API:", error);
+    }
+}    
+    async function fetchData() {
         const endpoint = currentCategory === '2shot' ? '/api/status' : '/api/status_mg';
         try {
             const response = await fetch(endpoint);
