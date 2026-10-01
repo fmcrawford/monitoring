@@ -294,3 +294,57 @@ def monitor_worker():
                 send_daily_summary(member_status, now)
 
         time.sleep(CHECK_INTERVAL)
+
+# --- VARIABEL GLOBAL UNTUK UI WEB ---
+LATEST_STATUS_MG = {
+    "last_check": 0,
+    "total_quota": 0,
+    "members": []
+}
+
+def update_web_status_mg(api_data):
+    """Memformat raw data API M&G agar strukturnya sama dengan 2-Shot untuk UI."""
+    global LATEST_STATUS_MG
+    parsed_items = []
+    
+    if not api_data or "data" not in api_data:
+        return
+        
+    for session_obj in api_data["data"]:
+        session_name = session_obj.get("label", "-")
+        for detail in session_obj.get("session_members", []):
+            parsed_items.append({
+                "name": detail.get("member_name", "Unknown"),
+                "session": session_name,
+                "track": detail.get("label", "-"),
+                "quota": int(detail.get("available_quota", 0))
+            })
+            
+    LATEST_STATUS_MG["last_check"] = time.time()
+    LATEST_STATUS_MG["members"] = parsed_items
+    LATEST_STATUS_MG["total_quota"] = sum(m["quota"] for m in parsed_items)
+
+def monitor_worker():
+    """Fungsi utama monitoring."""
+    print("Mulai memonitor API JKT48...")
+    while True:
+        now = datetime.now()
+        api_data = fetch_jkt48_api()
+        
+        if api_data:
+            # --- TAMBAHKAN BARIS INI ---
+            update_web_status_mg(api_data) 
+            # ---------------------------
+
+            member_status = process_member_quotas(api_data)
+            
+            # (Sisa kode ke bawah biarkan sama persis seperti aslinya)
+            if not state["initial_sent"]:
+
+                def get_mg_data():
+    """Mengembalikan data M&G terbaru untuk endpoint Flask / UI."""
+    return LATEST_STATUS_MG
+
+if __name__ == "__main__":
+    monitor_thread = threading.Thread(target=monitor_worker, daemon=True)
+# ...
