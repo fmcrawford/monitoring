@@ -77,7 +77,7 @@
         <div class="col-md-6">
             <input type="text" id="searchBox" class="form-control search-box w-100" placeholder="Cari nama member..." onkeyup="applyFilters()">
         </div>
-        <div class="col-md-3" id="filter-toggle-container" style="display: none;">
+        <div class="col-md-3" id="filter-toggle-container">
             <div class="form-check form-switch d-flex align-items-center gap-2 m-0">
                 <input class="form-check-input fs-4 m-0" type="checkbox" role="switch" id="availableOnlyToggle" onchange="applyFilters()">
                 <label class="form-check-label text-muted" style="padding-top: 2px;" for="availableOnlyToggle">Hanya Tersedia</label>
@@ -111,7 +111,7 @@
 
 <script>
     // Ambil data favorit dari LocalStorage
-    let favoriteMembers = JSON.parse(localStorage.getItem('jkt48_favorites')) || [];
+    let favoriteMembers = JSON.parse(localStorage.getItem('jkt48_favorites')) || ["Grace Octaviani"];
 
     let currentCategory = '2shot';
     let fetchInterval;
@@ -134,16 +134,13 @@
         currentCategory = category;
         const btn2shot = document.getElementById('btn-2shot');
         const btnMg = document.getElementById('btn-mg');
-        const filterContainer = document.getElementById('filter-toggle-container');
         
         if (category === '2shot') {
             btn2shot.className = 'btn btn-custom-active px-4 rounded-pill';
             btnMg.className = 'btn btn-custom-inactive px-4 rounded-pill';
-            filterContainer.style.display = 'none'; // Sembunyikan filter untuk 2shot (selalu tampilkan tersedia)
         } else {
             btn2shot.className = 'btn btn-custom-inactive px-4 rounded-pill';
             btnMg.className = 'btn btn-custom-active px-4 rounded-pill';
-            filterContainer.style.display = 'block'; // Tampilkan filter untuk M&G
         }
 
         document.getElementById('data-container').innerHTML = `
@@ -231,14 +228,7 @@
             }
 
             const matchesSearch = member.name.toLowerCase().includes(searchQuery);
-            
-            // Logika Visibilitas: 2shot WAJIB tiket > 0. M&G ikuti toggle filter.
-            let matchesAvailability = true;
-            if (currentCategory === '2shot') {
-                matchesAvailability = member.totalQuota > 0;
-            } else {
-                matchesAvailability = showAvailableOnly ? member.totalQuota > 0 : true;
-            }
+            const matchesAvailability = showAvailableOnly ? member.totalQuota > 0 : true;
 
             return matchesSearch && matchesAvailability;
         });
@@ -258,7 +248,7 @@
             announcementContainer.innerHTML = '';
         }
 
-        // Urutkan: Tersedia dulu, lalu Abjad
+        // Urutkan: Tersedia dulu (termasuk yang restock), lalu yang Sold Out berdasarkan abjad
         filteredData.sort((a, b) => {
             if (a.totalQuota > 0 && b.totalQuota === 0) return -1;
             if (a.totalQuota === 0 && b.totalQuota > 0) return 1;
@@ -282,9 +272,9 @@
             const restockBadgeHtml = isRestocked ? `<span class="pulse-anim">🔥 RESTOCK</span>` : '';
             
             const itemClass = isAvailable ? 'has-tickets' : 'sold-out-item';
-            const specialCardClass = isFavorite ? 'special-card' : '';
-            const specialHeaderClass = isFavorite ? 'special-header' : '';
-            const specialTitleClass = isFavorite ? 'special-title' : 'text-white';
+            const specialCardClass = isFavorite && currentCategory === 'mg' ? 'special-card' : '';
+            const specialHeaderClass = isFavorite && currentCategory === 'mg' ? 'special-header' : '';
+            const specialTitleClass = isFavorite && currentCategory === 'mg' ? 'special-title' : 'text-white';
             
             const starIcon = isFavorite ? '★' : '☆';
             const starColor = isFavorite ? '#ffc107' : '#6c757d';
@@ -319,7 +309,7 @@
                 `;
             });
 
-            // Sembunyikan ikon bintang jika di 2shot
+            // Ikon bintang (Favorit) khusus ditampilkan di M&G
             const starHtml = currentCategory === 'mg' 
                 ? `<span class="fs-4 star-btn" style="color: ${starColor};" onclick="toggleFavorite('${memberData.name}')" title="Tandai sebagai Favorit">${starIcon}</span>`
                 : '';
@@ -379,6 +369,7 @@
                     ${regularHtml}`;
             }
         } else {
+            // Untuk 2-shot (yang tidak pakai section favorit)
             finalRender = regularHtml;
         }
 
