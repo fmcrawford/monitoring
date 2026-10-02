@@ -4,70 +4,8 @@ import requests
 from datetime import datetime
 from curl_cffi import requests as cffi_requests
 
-# Variabel global status untuk 2-Shot
-LATEST_STATUS_2SHOT = {
-    "last_check": 0,
-    "total_quota": 0,
-    "members": []
-}
-
-def get_2shot_data():
-    """Fungsi wajib dipanggil oleh app.py untuk endpoint 2-Shot"""
-    return LATEST_STATUS_2SHOT
-
-def fetch_2shot_api():
-    # Masukkan kode fetch API 2-Shot Anda di sini (menggunakan URL EX5B99)
-    pass
-
-def monitor_worker():
-    """Fungsi wajib agar app.py bisa menjalankan thread bot 2-Shot"""
-    print("Mulai memonitor API 2-Shot JKT48...")
-    while True:
-        # Logika loop bot 2-Shot Anda di sini
-        # Jangan lupa update LATEST_STATUS_2SHOT di setiap iterasi sukses
-        
-        time.sleep(60)
-
-# (Opsional jika bot.py dijalankan terpisah, tapi aman dibiarkan)
-if __name__ == "__main__":
-    monitor_worker()
-
-# ... (Kode bot 2-Shot Anda seperti biasa) ...
-
-app = Flask(__name__)
-CORS(app) # Mengizinkan UI dari port/domain lain memanggil API ini
-
-@app.route('/api/status')
-def get_status():
-    return jsonify(LATEST_STATUS)
-
-if __name__ == '__main__':
-    # Jalankan thread pemantau 2-Shot
-    t = threading.Thread(target=main_loop, daemon=True)
-    t.start()
-    
-    # Jalankan server API 2-Shot di port 5001
-    app.run(host='0.0.0.0', port=5001)
-
-# ... (Kode bot 2-Shot Anda seperti biasa) ...
-
-app = Flask(__name__)
-CORS(app) # Mengizinkan UI dari port/domain lain memanggil API ini
-
-@app.route('/api/status')
-def get_status():
-    return jsonify(LATEST_STATUS)
-
-if __name__ == '__main__':
-    # Jalankan thread pemantau 2-Shot
-    t = threading.Thread(target=main_loop, daemon=True)
-    t.start()
-    
-    # Jalankan server API 2-Shot di port 5001
-    app.run(host='0.0.0.0', port=5001)
-
 # ==========================================
-# KONFIGURASI BOT
+# KONFIGURASI BOT 2-SHOT
 # ==========================================
 EXCLUSIVE_URL = "https://jkt48.com/purchase/exclusive?code=EX5B99"
 API_URL = "https://jkt48.com/api/v1/exclusives/EX5B99/bonus?lang=id"
@@ -85,31 +23,22 @@ COLOR_GOLD = 0xF1C40F
 COLOR_BLUE = 0x3498DB
 COLOR_PURPLE = 0x9B59B6
 
-# ==========================================
-# FUNGSI UNTUK DIIMPOR OLEH APP.PY
-# ==========================================
-def monitor_2shot_worker():
-    """Menjalankan loop utama bot 2-Shot."""
-    main_loop()
-
-def get_2shot_data():
-    """Mengembalikan data status terbaru untuk API/Web UI."""
-    return LATEST_STATUS
-
-
-# --- VARIABEL GLOBAL UNTUK UI WEB ---
+# Variabel Global Status untuk UI Web
 LATEST_STATUS = {
     "last_check": 0,
     "total_quota": 0,
     "members": []
 }
 
+def get_2shot_data():
+    """Mengembalikan data status terbaru untuk API/Web UI."""
+    return LATEST_STATUS
+
 def update_web_status(member_list):
     global LATEST_STATUS
     LATEST_STATUS["last_check"] = time.time()
     LATEST_STATUS["members"] = member_list
     LATEST_STATUS["total_quota"] = sum(m["quota"] for m in member_list)
-# ------------------------------------
 
 def send_discord_embed(title, color, description=None, fields=None, content_text=None, thumbnail_url=LOGO_URL):
     if not DISCORD_WEBHOOK_URL: 
@@ -163,7 +92,6 @@ def parse_api_data(response_json):
         return parsed_items
     
     sessions = response_json.get("data", [])
-
     for session_obj in sessions:
         if not isinstance(session_obj, dict): 
             continue
@@ -188,52 +116,22 @@ def parse_api_data(response_json):
             
     return parsed_items
 
-def main_loop():
-    print("Mulai inisiasi bot dan mengambil data API JKT48...\n")
+def monitor_worker():
+    """Fungsi wajib agar app.py bisa menjalankan thread bot 2-Shot"""
+    print("Mulai inisiasi bot 2-Shot dan mengambil data API JKT48...\n")
     
     data = None
     while not data:
         data = fetch_api()
         if not data:
-            print("⏳ Menunggu data API...")
             time.sleep(5)
             
     members = parse_api_data(data)
-    if not members:
-        return
-
-    update_web_status(members) # Update Web UI
-    prev_state = {m["id"]: m for m in members}
+    if members:
+        update_web_status(members)
+        
+    prev_state = {m["id"]: m for m in members} if members else {}
     restocked_this_hour = {}
-
-    total_quota_available = sum(m["quota"] for m in members)
-    special_at_startup = [m for m in members if m["quota"] > 0 and m["name"] in SPECIAL_TARGETS]
-
-    if special_at_startup:
-        for sp in special_at_startup:
-            fields = [
-                {"name": "Nama Member", "value": f"**{sp['name']}**", "inline": True},
-                {"name": "Sesi / Jalur", "value": f"`{sp['session']}` • `{sp['track']}`", "inline": True},
-                {"name": "Sisa Kuota", "value": f"🎫 **{sp['quota']} Tiket**", "inline": True},
-                {"name": "Akses Cepat", "value": f"⚡ [**KLIK DI SINI UNTUK BELI SEKARANG**]({EXCLUSIVE_URL})", "inline": False}
-            ]
-            send_discord_embed(title="🌟 STARTUP SPECIAL OSHI ALERT", color=COLOR_GOLD, fields=fields, content_text="@everyone **Target Oshi kamu tersedia sejak bot aktif!**")
-
-    available_list = [m for m in members if m["quota"] > 0]
-    if available_list:
-        lines = [f"• **{m['name']}** — `{m['session']}` | `{m['track']}` (Sisa: **{m['quota']}**)" for m in available_list]
-        chunk_str = "\n".join(lines[:20])
-        if len(lines) > 20:
-            chunk_str += f"\n\n*...dan {len(lines) - 20} slot lainnya.*"
-        fields = [
-            {"name": "Ringkasan Sistem", "value": f"Total Slot Terbuka: **{len(available_list)}**\nTotal Tiket: **{total_quota_available} Tiket**", "inline": False},
-            {"name": "Daftar Slot Tersedia", "value": chunk_str, "inline": False},
-            {"name": "Tautan Pembelian", "value": f"🔗 [**Buka Halaman Event JKT48**]({EXCLUSIVE_URL})", "inline": False}
-        ]
-        send_discord_embed(title="🚀 STATUS AWAL 2-SHOT JKT48", color=COLOR_GREEN, fields=fields)
-    else:
-        send_discord_embed(title="🚀 STATUS AWAL 2-SHOT JKT48", color=COLOR_RED, description="❌ Saat ini seluruh slot tercatat **Sold Out**.\nBot akan terus memantau penambahan tiket secara real-time.")
-
     last_recap_time = time.time()
 
     while True:
@@ -247,7 +145,7 @@ def main_loop():
         if not curr_members: 
             continue
         
-        update_web_status(curr_members) # Update Web UI Realtime
+        update_web_status(curr_members)
         curr_state = {m["id"]: m for m in curr_members}
         
         for uid, curr_item in curr_state.items():
@@ -275,32 +173,7 @@ def main_loop():
                         send_discord_embed(title="🚨 TICKET RESTOCK DETECTED", color=COLOR_BLUE, fields=fields)
 
         if time.time() - last_recap_time >= HOURLY_INTERVAL:
-            available_recap = [m for m in curr_members if m["quota"] > 0]
-            if available_recap:
-                lines = []
-                for m in available_recap:
-                    if m["id"] in restocked_this_hour:
-                        added_amt = restocked_this_hour[m["id"]]
-                        lines.append(f"• **{m['name']}** — `{m['session']}` | `{m['track']}` — Sisa: **{m['quota']}** 📈 `[+{added_amt} Stok Masuk]`")
-                    else:
-                        lines.append(f"• **{m['name']}** — `{m['session']}` | `{m['track']}` — Sisa: **{m['quota']}**")
-
-                content_body = "\n".join(lines[:25])
-                if len(lines) > 25:
-                    content_body += f"\n\n*...dan {len(lines) - 25} slot lainnya.*"
-
-                fields = [
-                    {"name": "Daftar Slot Aktif", "value": content_body, "inline": False},
-                    {"name": "Beli Tiket", "value": f"🔗 [**Halaman Pembelian Official**]({EXCLUSIVE_URL})", "inline": False}
-                ]
-                send_discord_embed(title="📊 REKAP KETERSEDIAAN TIKET (1 JAM)", color=COLOR_PURPLE, fields=fields)
-            else:
-                send_discord_embed(title="📊 REKAP KETERSEDIAAN TIKET (1 JAM)", color=COLOR_RED, description="❌ Saat ini seluruh kuota tiket dalam kondisi **Sold Out**.")
-
             last_recap_time = time.time()
             restocked_this_hour.clear()
 
         prev_state = curr_state
-
-    def get_2shot_data():
-        return LATEST_STATUS  # Sesuaikan dengan nama variabel global status 2-shot Anda
