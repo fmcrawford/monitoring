@@ -117,7 +117,7 @@
     let fetchInterval;
     let rawData = [];
     let lastQuotaState = {}; 
-    let recentRestocks = {}; // Menyimpan timestamp restock per member
+    let recentRestocks = {}; 
 
     function toggleFavorite(memberName) {
         const index = favoriteMembers.indexOf(memberName);
@@ -148,7 +148,7 @@
                 <div class="spinner-border text-danger mb-3" role="status"></div>
                 <div>Memuat data ${category === '2shot' ? '2-Shot' : 'Meet & Greet'}...</div>
             </div>`;
-        document.getElementById('announcement-container').innerHTML = ''; // Reset banner
+        document.getElementById('announcement-container').innerHTML = '';
         lastQuotaState = {}; 
         fetchData();
     }
@@ -198,7 +198,6 @@
             if (lastQuotaState[member.name] !== undefined && member.totalQuota > lastQuotaState[member.name]) {
                 const diff = member.totalQuota - lastQuotaState[member.name];
                 restockMessages.push(`<b>${member.name}</b> (+${diff} Tiket)`);
-                // Tandai member ini baru restok, catat waktunya
                 recentRestocks[member.name] = Date.now();
             }
         });
@@ -218,11 +217,9 @@
         const announcementContainer = document.getElementById('announcement-container');
         const now = Date.now();
 
-        // Banner Announcement M&G
         let eligibleForExtra = [];
 
         let filteredData = rawData.filter(member => {
-            // Track eligible members untuk M&G Banner
             if (currentCategory === 'mg' && member.totalQuota === 0 && member.sessions.length < 4) {
                 eligibleForExtra.push(member.name);
             }
@@ -233,7 +230,6 @@
             return matchesSearch && matchesAvailability;
         });
 
-        // Tampilkan Banner M&G jika ada yang berpotensi sesi tambahan
         if (currentCategory === 'mg' && eligibleForExtra.length > 0) {
             announcementContainer.innerHTML = `
                 <div class="alert alert-danger mb-4 mx-auto d-flex align-items-center border-0 shadow-sm" style="max-width: 800px; background-color: #2a1114; color: #f8d7da; border: 1px solid #58151c !important;">
@@ -248,7 +244,6 @@
             announcementContainer.innerHTML = '';
         }
 
-        // Urutkan: Tersedia dulu (termasuk yang restock), lalu yang Sold Out berdasarkan abjad
         filteredData.sort((a, b) => {
             if (a.totalQuota > 0 && b.totalQuota === 0) return -1;
             if (a.totalQuota === 0 && b.totalQuota > 0) return 1;
@@ -267,7 +262,6 @@
             const isAvailable = memberData.totalQuota > 0;
             const isFavorite = favoriteMembers.includes(memberData.name);
             
-            // Logika Restock Sign (tampil jika waktu restock < 2 menit lalu)
             const isRestocked = recentRestocks[memberData.name] && (now - recentRestocks[memberData.name] < 120000); 
             const restockBadgeHtml = isRestocked ? `<span class="pulse-anim">🔥 RESTOCK</span>` : '';
             
@@ -283,7 +277,6 @@
                 ? `<span class="badge bg-success rounded-pill px-3 py-2 shadow-sm">${memberData.totalQuota} Tersedia</span>` 
                 : `<span class="badge bg-secondary rounded-pill px-3 py-2">Sold Out</span>`;
 
-            // Logika Banner Sesi pada Card (Hanya untuk M&G)
             let extraSessionHtml = '';
             if (currentCategory === 'mg' && memberData.totalQuota === 0) {
                 if (memberData.sessions.length < 4) {
@@ -309,10 +302,21 @@
                 `;
             });
 
-            // Ikon bintang (Favorit) khusus ditampilkan di M&G
             const starHtml = currentCategory === 'mg' 
                 ? `<span class="fs-4 star-btn" style="color: ${starColor};" onclick="toggleFavorite('${memberData.name}')" title="Tandai sebagai Favorit">${starIcon}</span>`
                 : '';
+
+            // Render Tombol Beli Tiket khusus untuk 2-Shot yang tersedia
+            let buyButtonHtml = '';
+            if (currentCategory === '2shot' && isAvailable) {
+                buyButtonHtml = `
+                    <div class="card-footer bg-transparent border-0 px-3 pb-3 pt-0">
+                        <a href="https://jkt48.com/purchase/exclusive?code=EX5B99" target="_blank" class="btn btn-success btn-sm w-100 fw-bold rounded-pill shadow-sm">
+                            🛒 Beli Tiket
+                        </a>
+                    </div>
+                `;
+            }
 
             const cardHtml = `
                 <div class="col">
@@ -328,7 +332,7 @@
                         </div>
                         ${extraSessionHtml}
                         <div class="card-body p-0 flex-grow-1">
-                            <table class="table table-dark table-sm align-middle m-0" style="font-size: 0.9rem;">
+                            <table class="table table-dark table-sm align-middle mb-2" style="font-size: 0.9rem;">
                                 <thead class="text-muted border-bottom border-secondary" style="font-size: 0.8rem;">
                                     <tr>
                                         <th class="text-start fw-normal">Sesi</th>
@@ -341,6 +345,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        ${buyButtonHtml}
                     </div>
                 </div>
             `;
@@ -352,7 +357,6 @@
             }
         });
 
-        // Struktur Render HTML Akhir
         let finalRender = '';
         if (currentCategory === 'mg' && favoriteHtml !== '') {
             finalRender += `
@@ -369,7 +373,6 @@
                     ${regularHtml}`;
             }
         } else {
-            // Untuk 2-shot (yang tidak pakai section favorit)
             finalRender = regularHtml;
         }
 
