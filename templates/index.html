@@ -8,18 +8,24 @@
     <style>
         body { background-color: #0f1115; color: #ffffff; padding-top: 2rem; padding-bottom: 2rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
         .card-header-custom { background-color: #1a1d24; border-bottom: 1px solid #2d323b; }
-        .accordion-button { background-color: #1a1d24 !important; color: white !important; box-shadow: none !important; border-bottom: 1px solid #2d323b; }
-        .accordion-button:not(.collapsed) { background-color: #242833 !important; color: white !important; }
-        .accordion-button::after { filter: invert(1); }
-        .accordion-item { border: none; margin-bottom: 8px; border-radius: 8px !important; overflow: hidden; background-color: #1a1d24; transition: all 0.2s ease-in-out; }
         
-        /* Highlight khusus untuk member yang memiliki tiket */
-        .has-tickets { border-left: 4px solid #198754; box-shadow: 0 4px 12px rgba(25, 135, 84, 0.15); }
-        .sold-out-item { opacity: 0.65; border-left: 4px solid #6c757d; }
+        /* Grid Card Styles */
+        .member-card { background-color: #1a1d24; border-radius: 10px; border: 1px solid #2d323b; height: 100%; display: flex; flex-direction: column; overflow: hidden; transition: transform 0.2s; }
+        .member-card:hover { transform: translateY(-3px); }
+        .card-header-member { background-color: #21252d; padding: 12px 16px; border-bottom: 1px solid #2d323b; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Status Highlight */
+        .has-tickets { border-bottom: 4px solid #198754; box-shadow: 0 4px 12px rgba(25, 135, 84, 0.1); }
+        .sold-out-item { opacity: 0.65; border-bottom: 4px solid #6c757d; }
         .sold-out-item:hover { opacity: 1; }
+        
+        /* Special Member Styles */
+        .special-card { border: 1px solid #ffc107; box-shadow: 0 0 15px rgba(255, 193, 7, 0.15); border-bottom: 4px solid #ffc107; }
+        .special-header { background: linear-gradient(145deg, #2a220b 0%, #1a1d24 100%); border-bottom: 1px solid #4a3805; }
+        .special-title { color: #ffc107 !important; text-shadow: 0 0 8px rgba(255,193,7,0.4); }
 
         .table-dark { --bs-table-bg: transparent; margin-bottom: 0; }
-        .table-dark td, .table-dark th { border-color: #2d323b; color: #e1e4e8; }
+        .table-dark td, .table-dark th { border-color: #2d323b; color: #e1e4e8; padding: 8px 16px; }
         
         .search-box { background-color: #1a1d24; border: 1px solid #2d323b; color: white; border-radius: 20px; padding: 10px 20px; }
         .search-box:focus { background-color: #242833; border-color: #dc3545; color: white; box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25); }
@@ -31,7 +37,7 @@
 </head>
 <body>
 
-<div class="container" style="max-width: 800px;">
+<div class="container-fluid" style="max-width: 1200px;">
     <div class="d-flex align-items-center justify-content-center mb-4 gap-2">
         <h2 class="m-0 fw-bold">🎫 JKT48 Monitor</h2>
     </div>
@@ -43,29 +49,29 @@
     </div>
 
     <!-- Info Box -->
-    <div class="card card-header-custom border-0 rounded-4 mb-4 shadow-sm">
+    <div class="card card-header-custom border-0 rounded-4 mb-4 shadow-sm mx-auto" style="max-width: 600px;">
         <div class="card-body text-center">
             <h5 class="text-muted mb-1 fs-6">Total Kuota Tersedia</h5>
-            <div class="display-4 fw-bold text-success mb-2" id="total-quota">0</div>
+            <div class="display-5 fw-bold text-success mb-2" id="total-quota">0</div>
             <small class="text-muted">Update terakhir: <span id="last-update" class="fw-medium text-white">-</span></small>
         </div>
     </div>
 
     <!-- Kontrol UX: Search & Filter -->
-    <div class="row g-3 mb-4 align-items-center">
-        <div class="col-md-8">
+    <div class="row g-3 mb-4 align-items-center justify-content-center">
+        <div class="col-md-6">
             <input type="text" id="searchBox" class="form-control search-box w-100" placeholder="Cari nama member (misal: Grace, Marsha)..." onkeyup="applyFilters()">
         </div>
-        <div class="col-md-4">
-            <div class="form-check form-switch d-flex align-items-center justify-content-md-end gap-2 m-0">
+        <div class="col-md-3">
+            <div class="form-check form-switch d-flex align-items-center gap-2 m-0">
                 <input class="form-check-input fs-4 m-0" type="checkbox" role="switch" id="availableOnlyToggle" onchange="applyFilters()">
                 <label class="form-check-label text-muted" style="padding-top: 2px;" for="availableOnlyToggle">Hanya Tersedia</label>
             </div>
         </div>
     </div>
 
-    <!-- Data Container -->
-    <div class="accordion" id="data-container">
+    <!-- Data Container (Grid) -->
+    <div id="data-container">
         <div class="text-center py-5 text-muted">
             <div class="spinner-border text-danger mb-3" role="status"></div>
             <div>Menyinkronkan data...</div>
@@ -89,6 +95,16 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+    // ==========================================
+    // PENGATURAN SPECIAL MEMBERS (MANUAL)
+    // ==========================================
+    // Tambahkan nama member ke dalam array di bawah ini untuk memberi mereka highlight khusus pada bagian Meet & Greet
+    const specialMembers = [
+        "Grace Octaviani",
+        "Michelle Alexandra",
+        "Marsha Lenathea"
+    ];
+
     let currentCategory = '2shot';
     let fetchInterval;
     let rawData = [];
@@ -112,7 +128,7 @@
                 <div class="spinner-border text-danger mb-3" role="status"></div>
                 <div>Memuat data ${category === '2shot' ? '2-Shot' : 'Meet & Greet'}...</div>
             </div>`;
-        lastQuotaState = {}; // Reset state notifikasi saat ganti tab
+        lastQuotaState = {}; 
         fetchData();
     }
 
@@ -123,7 +139,6 @@
             const response = await fetch(endpoint);
             const data = await response.json();
             
-            // Update Header Info
             document.getElementById('total-quota').innerText = data.total_quota || 0;
             if (data.last_check) {
                 const date = new Date(data.last_check * 1000);
@@ -154,13 +169,11 @@
         });
 
         rawData = Object.values(grouped);
-
-        // Cek notifikasi restock
         let restockMessages = [];
+
         rawData.forEach(member => {
             currentQuotaState[member.name] = member.totalQuota;
             
-            // Jika sebelumnya sudah ada data, dan kuota sekarang lebih besar dari sebelumnya
             if (lastQuotaState[member.name] !== undefined && member.totalQuota > lastQuotaState[member.name]) {
                 const diff = member.totalQuota - lastQuotaState[member.name];
                 restockMessages.push(`<b>${member.name}</b> (+${diff} Tiket)`);
@@ -180,35 +193,39 @@
         const showAvailableOnly = document.getElementById('availableOnlyToggle').checked;
         const container = document.getElementById('data-container');
 
-        // Filter Data
         let filteredData = rawData.filter(member => {
             const matchesSearch = member.name.toLowerCase().includes(searchQuery);
             const matchesAvailability = showAvailableOnly ? member.totalQuota > 0 : true;
             return matchesSearch && matchesAvailability;
         });
 
-        // Sort Data: Prioritaskan yang ada tiket, lalu abjad
+        // Urutkan: Tersedia dulu, lalu Abjad
         filteredData.sort((a, b) => {
             if (a.totalQuota > 0 && b.totalQuota === 0) return -1;
             if (a.totalQuota === 0 && b.totalQuota > 0) return 1;
             return a.name.localeCompare(b.name);
         });
 
-        // Render HTML
         if (filteredData.length === 0) {
             container.innerHTML = `<div class="text-center py-5 text-muted">Tidak ada member yang cocok dengan pencarian/filter saat ini.</div>`;
             return;
         }
 
-        let html = '';
+        let specialHtml = '';
+        let regularHtml = '';
+
         filteredData.forEach(memberData => {
             const isAvailable = memberData.totalQuota > 0;
-            const safeId = memberData.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+            const isSpecial = currentCategory === 'mg' && specialMembers.includes(memberData.name);
             
             const itemClass = isAvailable ? 'has-tickets' : 'sold-out-item';
+            const specialCardClass = isSpecial ? 'special-card' : '';
+            const specialHeaderClass = isSpecial ? 'special-header' : '';
+            const specialTitleClass = isSpecial ? 'special-title' : 'text-white';
+            
             const badgeHtml = isAvailable 
-                ? `<span class="badge bg-success rounded-pill px-3 py-2 ms-auto shadow-sm">${memberData.totalQuota} Tersedia</span>` 
-                : `<span class="badge bg-secondary rounded-pill px-3 py-2 ms-auto">Sold Out</span>`;
+                ? `<span class="badge bg-success rounded-pill px-3 py-2 shadow-sm">${memberData.totalQuota} Tersedia</span>` 
+                : `<span class="badge bg-secondary rounded-pill px-3 py-2">Sold Out</span>`;
 
             let tableRows = '';
             memberData.sessions.forEach(s => {
@@ -219,29 +236,29 @@
                 
                 tableRows += `
                     <tr style="${!sessionAvailable ? 'opacity: 0.4;' : ''}">
-                        <td class="text-start ps-4">${s.session}</td>
-                        <td>${s.track}</td>
-                        <td class="text-end pe-4">${statusBadge}</td>
+                        <td class="text-start">${s.session}</td>
+                        <td class="text-center">${s.track}</td>
+                        <td class="text-end">${statusBadge}</td>
                     </tr>
                 `;
             });
 
-            html += `
-                <div class="accordion-item ${itemClass}">
-                    <h2 class="accordion-header" id="heading-${safeId}">
-                        <button class="accordion-button collapsed d-flex align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${safeId}">
-                            <span class="fw-bold fs-6 me-2 text-white">${memberData.name}</span> 
+            const cardHtml = `
+                <div class="col">
+                    <div class="member-card ${itemClass} ${specialCardClass}">
+                        <div class="card-header-member ${specialHeaderClass}">
+                            <h5 class="m-0 fw-bold ${specialTitleClass}">
+                                ${memberData.name} ${isSpecial ? '⭐' : ''}
+                            </h5>
                             ${badgeHtml}
-                        </button>
-                    </h2>
-                    <div id="collapse-${safeId}" class="accordion-collapse collapse" data-bs-parent="#data-container">
-                        <div class="accordion-body p-0 pb-2">
-                            <table class="table table-dark table-sm text-center align-middle m-0">
-                                <thead class="text-muted" style="font-size: 0.85rem;">
+                        </div>
+                        <div class="card-body p-0 flex-grow-1">
+                            <table class="table table-dark table-sm align-middle m-0" style="font-size: 0.9rem;">
+                                <thead class="text-muted border-bottom border-secondary" style="font-size: 0.8rem;">
                                     <tr>
-                                        <th class="text-start ps-4 fw-normal">Sesi</th>
-                                        <th class="fw-normal">Jalur</th>
-                                        <th class="text-end pe-4 fw-normal">Stok</th>
+                                        <th class="text-start fw-normal">Sesi</th>
+                                        <th class="text-center fw-normal">Jalur</th>
+                                        <th class="text-end fw-normal">Stok</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -252,9 +269,35 @@
                     </div>
                 </div>
             `;
+
+            if (isSpecial) {
+                specialHtml += cardHtml;
+            } else {
+                regularHtml += cardHtml;
+            }
         });
 
-        container.innerHTML = html;
+        // Struktur Render HTML Akhir
+        let finalRender = '';
+        if (currentCategory === 'mg' && specialHtml !== '') {
+            finalRender += `
+                <div class="col-12 mb-3 mt-2">
+                    <h4 class="fw-bold text-warning border-bottom border-warning pb-2 d-inline-block pe-4">⭐ Oshi / Special Members</h4>
+                </div>
+                ${specialHtml}`;
+            
+            if (regularHtml !== '') {
+                finalRender += `
+                    <div class="col-12 mb-3 mt-5">
+                        <h4 class="fw-bold text-white border-bottom border-secondary pb-2 d-inline-block pe-4">👥 Member Lainnya</h4>
+                    </div>
+                    ${regularHtml}`;
+            }
+        } else {
+            finalRender = regularHtml;
+        }
+
+        container.innerHTML = `<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">${finalRender}</div>`;
     }
 
     function showToast(message) {
