@@ -7,7 +7,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background-color: #121212; color: #ffffff; padding-top: 2rem; padding-bottom: 2rem; }
-        /* Styling tambahan agar Accordion cocok dengan tema gelap */
         .accordion-button { background-color: #2b2b2b !important; color: white !important; box-shadow: none !important; }
         .accordion-button:not(.collapsed) { background-color: #dc3545 !important; color: white !important; }
         .accordion-button::after { filter: invert(1); }
@@ -19,25 +18,21 @@
 <div class="container" style="max-width: 800px;">
     <h2 class="text-center mb-4">🎫 JKT48 Ticket Monitor</h2>
 
-    <!-- Tombol Kategori -->
     <div class="d-flex justify-content-center gap-3 mb-4">
         <button id="btn-2shot" class="btn btn-danger active" onclick="switchCategory('2shot')">📸 2-Shot</button>
         <button id="btn-mg" class="btn btn-outline-danger" onclick="switchCategory('mg')">🤝 Meet & Greet</button>
     </div>
 
-    <!-- Info Status -->
     <div class="alert alert-secondary text-center" role="alert">
         Total Kuota Tersedia: <span id="total-quota" class="fw-bold fs-5 text-success">0</span> Tiket <br>
         <small class="text-muted">Pembaruan Terakhir: <span id="last-update">-</span></small>
     </div>
 
-    <!-- Tempat Data Accordion -->
     <div class="accordion" id="data-container">
         <div class="text-center py-4">Memuat data...</div>
     </div>
 </div>
 
-<!-- Wajib ditambahkan agar fitur klik (collapse) berfungsi -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
@@ -62,27 +57,15 @@
     }
 
     async function fetchData() {
-    // Panggil port 5001 untuk 2-Shot, atau port 5002 untuk M&G
-    const endpoint = currentCategory === '2shot' 
-        ? 'http://localhost:5001/api/status' 
-        : 'http://localhost:5002/api/status';
-    
-    try {
-        const response = await fetch(endpoint);
-        const data = await response.json();
-        renderData(data);
-    } catch (error) {
-        console.error("Gagal mengambil data dari API:", error);
-    }
-}    
-    async function fetchData() {
-        const endpoint = currentCategory === '2shot' ? '/api/status' : '/api/status_mg';
+        // Pemilihan API Relatif otomatis menyesuaikan domain / port aplikasi berjalan
+        const endpoint = currentCategory === '2shot' ? '/api/status' : '/api/mg';
+        
         try {
             const response = await fetch(endpoint);
             const data = await response.json();
             renderData(data);
         } catch (error) {
-            console.error("Error:", error);
+            console.error("Gagal mengambil data dari API:", error);
             document.getElementById('data-container').innerHTML = '<div class="text-center py-4 text-danger">Gagal terhubung ke server.</div>';
         }
     }
@@ -101,41 +84,6 @@
             return;
         }
 
-        // Script yang sudah ada untuk memanggil 2-Shot
-            fetch('/api/status')
-                .then(response => response.json())
-                .then(data => {
-        // (Kode Anda untuk membuat tampilan/accordion 2-Shot)
-                });
-            
-            // SCRIPT BARU: Memanggil data M&G
-            fetch('/api/mg')
-                .then(response => response.json())
-                .then(data => {
-                    const mgContainer = document.getElementById('mg-container');
-                    
-                    // Cek apakah ada data
-                    if (!data || data.members.length === 0) {
-                        mgContainer.innerHTML = "<p>Data M&G belum tersedia.</p>";
-                        return;
-                    }
-            
-                    // Loop dan buat elemen tampilan (sesuaikan dengan format 2-shot Anda)
-                    let htmlContent = "";
-                    data.members.forEach(member => {
-                        htmlContent += `
-                            <div class="member-card">
-                                <h3>${member.name}</h3>
-                                <p>Sesi: ${member.session} | Jalur: ${member.track}</p>
-                                <p>Sisa Kuota: <b>${member.quota}</b></p>
-                            </div>
-                        `;
-                    });
-                    mgContainer.innerHTML = htmlContent;
-                })
-                .catch(error => console.error("Error fetching M&G:", error));
-        
-        // 1. Kelompokkan data berdasarkan Nama Member
         const groupedByMember = {};
         data.members.forEach(m => {
             if (!groupedByMember[m.name]) {
@@ -145,15 +93,12 @@
             groupedByMember[m.name].totalQuota += m.quota;
         });
 
-        // 2. Urutkan nama member sesuai alfabet
         const sortedNames = Object.keys(groupedByMember).sort();
 
-        // 3. Buat HTML untuk Accordion
         let accordionHTML = '';
         sortedNames.forEach((name, index) => {
             const memberData = groupedByMember[name];
             const isAllSoldOut = memberData.totalQuota === 0;
-            // Buat ID aman (hapus spasi/simbol) untuk target collapse Bootstrap
             const safeId = name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
 
             const totalBadge = isAllSoldOut 
@@ -172,12 +117,6 @@
                     </tr>
                 `;
             });
-
-            <h2>Status Tiket 2-Shot</h2>
-            <div id="twoshot-container"></div> <!-- Ini yang sudah ada -->
-
-            <h2>Status Tiket Meet & Greet</h2>
-            <div id="mg-container"></div> <!-- Ini wadah baru untuk M&G -->
             
             accordionHTML += `
                 <div class="accordion-item border-secondary" style="background-color: #1e1e1e;">
@@ -207,7 +146,10 @@
     }
 
     fetchData();
-    fetchInterval = setInterval(fetchData, 15000);
+    // Refresh otomatis setiap 15 detik
+    if (!fetchInterval) {
+        fetchInterval = setInterval(fetchData, 15000);
+    }
 </script>
 
 </body>
