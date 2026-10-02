@@ -153,6 +153,7 @@
         fetchData();
     }
 
+    // --- FUNGSI FETCH DENGAN MODE DETEKSI ---
     async function fetchData() {
         const endpoint = currentCategory === '2shot' ? '/api/status' : '/api/mg';
         
@@ -166,14 +167,28 @@
                 document.getElementById('last-update').innerText = date.toLocaleTimeString('id-ID');
             }
 
-            if (!data.members || data.members.length === 0) {
-                document.getElementById('data-container').innerHTML = '<div class="text-center py-5 text-muted">Sedang menunggu data dari server JKT48...</div>';
+            // Jika struktur JSON tidak memiliki property 'members'
+            if (!data.members) {
+                document.getElementById('data-container').innerHTML = `
+                    <div class="alert alert-warning m-4 text-start shadow" style="background-color: #2b2f36; color: #fff; border: 1px solid #ffc107;">
+                        <h5 class="text-warning fw-bold">🔍 Mode Deteksi Struktur Data</h5>
+                        <p>Frontend berhasil memanggil API, tetapi tidak menemukan key <code>members</code>. Berikut isi data asli dari backend Anda:</p>
+                        <pre class="bg-dark text-info p-3 rounded border border-secondary" style="font-size: 0.85rem; overflow-x: auto;">${JSON.stringify(data, null, 2)}</pre>
+                        <p class="mb-0 mt-2 text-white-50"><small>Silakan copy atau screenshot teks kode di atas dan kirimkan ke saya agar variabelnya bisa disesuaikan.</small></p>
+                    </div>`;
+                return;
+            }
+
+            // Jika property 'members' ada tapi memang sedang kosong dari servernya
+            if (data.members.length === 0) {
+                document.getElementById('data-container').innerHTML = '<div class="text-center py-5 text-muted">Data dari backend kosong (0 tiket). Sedang menunggu update web JKT48...</div>';
                 return;
             }
 
             processRawData(data.members);
         } catch (error) {
             console.error("Fetch error:", error);
+            document.getElementById('data-container').innerHTML = `<div class="text-center py-5 text-danger">Gagal mengambil API: ${error.message}</div>`;
         }
     }
 
