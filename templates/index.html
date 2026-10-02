@@ -38,13 +38,14 @@
 
 <div class="container-fluid" style="max-width: 1200px;">
     <div class="d-flex align-items-center justify-content-center mb-4 gap-2">
-        <h2 class="m-0 fw-bold">🎫 JKT48 & AKB48 Monitor</h2>
+        <h2 class="m-0 fw-bold">🎫 JKT48 & AKB48 Ticket Monitor</h2>
     </div>
 
-    <!-- Toggle Kategori -->
-    <div class="d-flex justify-content-center gap-2 mb-4">
-        <button id="btn-2shot" class="btn btn-custom-active px-4 rounded-pill" onclick="switchCategory('2shot')">📸 2-Shot AKB48</button>
-        <button id="btn-mg" class="btn btn-custom-inactive px-4 rounded-pill" onclick="switchCategory('mg')">🤝 Meet & Greet JKT48</button>
+    <!-- Toggle 3 Pilihan Kategori -->
+    <div class="d-flex justify-content-center gap-2 mb-4 flex-wrap">
+        <button id="btn-akb-2shot" class="btn btn-custom-active px-4 rounded-pill mb-2" onclick="switchCategory('akb_2shot')">📸 2-Shot AKB48</button>
+        <button id="btn-jkt-2shot" class="btn btn-custom-inactive px-4 rounded-pill mb-2" onclick="switchCategory('jkt_2shot')">📸 2-Shot JKT48</button>
+        <button id="btn-mg" class="btn btn-custom-inactive px-4 rounded-pill mb-2" onclick="switchCategory('mg')">🤝 Meet & Greet JKT48</button>
     </div>
 
     <!-- Info Box Event Banner -->
@@ -62,13 +63,13 @@
     <!-- Banner Announcement -->
     <div id="announcement-container"></div>
 
-    <!-- Kontrol UX: Search, Dropdown Sesi, Filter -->
+    <!-- Kontrol UX: Search, Dropdown Sesi (khusus AKB), Filter -->
     <div class="row g-3 mb-4 align-items-center justify-content-center">
         <div class="col-md-4">
             <input type="text" id="searchBox" class="form-control search-box w-100" placeholder="Cari nama member..." onkeyup="applyFilters()">
         </div>
         <div class="col-md-4" id="session-dropdown-wrapper">
-            <!-- Dropdown Sesi khusus 2-Shot AKB48 -->
+            <!-- Dropdown Sesi akan muncul otomatis saat di menu 2-Shot AKB48 -->
         </div>
         <div class="col-md-3" id="filter-toggle-container">
             <div class="form-check form-switch d-flex align-items-center gap-2 m-0">
@@ -91,12 +92,11 @@
 
 <script>
     let favoriteMembers = JSON.parse(localStorage.getItem('jkt48_favorites')) || ["Grace Octaviani"];
-    let currentCategory = '2shot';
-    let fetchInterval;
+    let currentCategory = 'akb_2shot';
     let rawData = [];
     let selectedSessionFilter = 'all';
 
-    // Data JSON statis AKB48 2-Shot yang Anda berikan
+    // Data JSON statis AKB48 2-Shot
     const akb2ShotData = {
         "status": true,
         "message": "Berhasil mendapatkan data",
@@ -187,16 +187,13 @@
 
     function switchCategory(category) {
         currentCategory = category;
-        const btn2shot = document.getElementById('btn-2shot');
+        const btnAkb2Shot = document.getElementById('btn-akb-2shot');
+        const btnJkt2Shot = document.getElementById('btn-jkt-2shot');
         const btnMg = document.getElementById('btn-mg');
         
-        if (category === '2shot') {
-            btn2shot.className = 'btn btn-custom-active px-4 rounded-pill';
-            btnMg.className = 'btn btn-custom-inactive px-4 rounded-pill';
-        } else {
-            btn2shot.className = 'btn btn-custom-inactive px-4 rounded-pill';
-            btnMg.className = 'btn btn-custom-active px-4 rounded-pill';
-        }
+        btnAkb2Shot.className = category === 'akb_2shot' ? 'btn btn-custom-active px-4 rounded-pill mb-2' : 'btn btn-custom-inactive px-4 rounded-pill mb-2';
+        btnJkt2Shot.className = category === 'jkt_2shot' ? 'btn btn-custom-active px-4 rounded-pill mb-2' : 'btn btn-custom-inactive px-4 rounded-pill mb-2';
+        btnMg.className = category === 'mg' ? 'btn btn-custom-active px-4 rounded-pill mb-2' : 'btn btn-custom-inactive px-4 rounded-pill mb-2';
 
         selectedSessionFilter = 'all';
         fetchData();
@@ -210,8 +207,7 @@
         let membersList = [];
         let totalQuotaCount = 0;
 
-        if (currentCategory === '2shot') {
-            // Render dari data statis AKB48 yang Anda berikan
+        if (currentCategory === 'akb_2shot') {
             const eventData = akb2ShotData.data;
             membersList = parseAKB48Sessions(eventData.session);
             
@@ -219,24 +215,25 @@
             document.getElementById('total-quota').innerText = totalQuotaCount;
             document.getElementById('last-update').innerText = new Date().toLocaleTimeString('id-ID');
 
-            renderEventHeader(eventData);
+            renderAKBEventHeader(eventData);
             renderSessionDropdown(eventData.session);
             processRawData(membersList);
         } else {
-            // Fetch ke endpoint Meet & Greet JKT48 backend
+            // Endpoint untuk 2-Shot JKT48 (/api/status) atau Meet & Greet JKT48 (/api/mg)
+            const endpoint = currentCategory === 'jkt_2shot' ? '/api/status' : '/api/mg';
             try {
-                const response = await fetch('/api/mg');
+                const response = await fetch(endpoint);
                 const resJson = await response.json();
                 membersList = resJson.members || [];
                 
-                membersList.forEach(m => { totalQuotaCount += (typeof m.quota === 'number' ? m.quota : 0); });
+                membersList.forEach(m => { totalQuotaCount += (typeof m.quota === 'number' ? m.quota : (m.quota_available ? 1 : 0)); });
                 document.getElementById('total-quota').innerText = resJson.total_quota !== undefined ? resJson.total_quota : totalQuotaCount;
                 document.getElementById('last-update').innerText = new Date().toLocaleTimeString('id-ID');
 
                 processRawData(membersList);
             } catch (error) {
                 console.error("Fetch error:", error);
-                document.getElementById('data-container').innerHTML = `<div class="text-center py-5 text-danger">Gagal mengambil data Meet & Greet: ${error.message}</div>`;
+                document.getElementById('data-container').innerHTML = `<div class="text-center py-5 text-danger">Gagal mengambil data dari server: ${error.message}</div>`;
             }
         }
     }
@@ -260,7 +257,7 @@
         return flatMembers;
     }
 
-    function renderEventHeader(eventData) {
+    function renderAKBEventHeader(eventData) {
         const headerContainer = document.getElementById('event-info-container');
         let priceFormatted = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(eventData.default_price || 200000);
         headerContainer.innerHTML = `
@@ -303,7 +300,7 @@
                 grouped[m.name] = { name: m.name, totalQuota: 0, sessions: [] };
             }
             grouped[m.name].sessions.push(m);
-            grouped[m.name].totalQuota += m.quota;
+            grouped[m.name].totalQuota += (typeof m.quota === 'number' ? m.quota : (m.quota_available ? 1 : 0));
         });
 
         rawData = Object.values(grouped);
@@ -328,12 +325,12 @@
             let matchesSession = true;
             let displayedSessions = member.sessions;
 
-            if (currentCategory === '2shot' && selectedSessionFilter !== 'all') {
+            if (currentCategory === 'akb_2shot' && selectedSessionFilter !== 'all') {
                 displayedSessions = member.sessions.filter(s => s.session.includes(selectedSessionFilter));
                 matchesSession = displayedSessions.length > 0;
             }
 
-            const activeQuotaCheck = displayedSessions.reduce((acc, s) => acc + s.quota, 0);
+            const activeQuotaCheck = displayedSessions.reduce((acc, s) => acc + (typeof s.quota === 'number' ? s.quota : (s.quota_available ? 1 : 0)), 0);
             const matchesAvailability = showAvailableOnly ? activeQuotaCheck > 0 : true;
 
             return matchesSearch && matchesSession && matchesAvailability;
@@ -367,18 +364,18 @@
 
         filteredData.forEach(memberData => {
             let sessionsToRender = memberData.sessions;
-            if (currentCategory === '2shot' && selectedSessionFilter !== 'all') {
+            if (currentCategory === 'akb_2shot' && selectedSessionFilter !== 'all') {
                 sessionsToRender = memberData.sessions.filter(s => s.session.includes(selectedSessionFilter));
             }
 
-            const currentFilteredQuota = sessionsToRender.reduce((acc, s) => acc + s.quota, 0);
+            const currentFilteredQuota = sessionsToRender.reduce((acc, s) => acc + (typeof s.quota === 'number' ? s.quota : (s.quota_available ? 1 : 0)), 0);
             const isAvailable = currentFilteredQuota > 0;
             const isFavorite = favoriteMembers.includes(memberData.name);
             
             const itemClass = isAvailable ? 'has-tickets' : 'sold-out-item';
-            const specialCardClass = isFavorite && currentCategory === 'mg' ? 'special-card' : '';
-            const specialHeaderClass = isFavorite && currentCategory === 'mg' ? 'special-header' : '';
-            const specialTitleClass = isFavorite && currentCategory === 'mg' ? 'special-title' : 'text-white';
+            const specialCardClass = isFavorite && (currentCategory === 'mg' || currentCategory === 'jkt_2shot') ? 'special-card' : '';
+            const specialHeaderClass = isFavorite && (currentCategory === 'mg' || currentCategory === 'jkt_2shot') ? 'special-header' : '';
+            const specialTitleClass = isFavorite && (currentCategory === 'mg' || currentCategory === 'jkt_2shot') ? 'special-title' : 'text-white';
             
             const starIcon = isFavorite ? '★' : '☆';
             const starColor = isFavorite ? '#ffc107' : '#6c757d';
@@ -398,26 +395,27 @@
 
             let tableRows = '';
             sessionsToRender.forEach(s => {
-                const sessionAvailable = s.quota > 0;
+                const qVal = typeof s.quota === 'number' ? s.quota : (s.quota_available ? 1 : 0);
+                const sessionAvailable = qVal > 0;
                 const statusBadge = sessionAvailable 
-                    ? `<span class="badge bg-success">${s.quota}</span>` 
+                    ? `<span class="badge bg-success">${qVal}</span>` 
                     : `<span class="badge bg-secondary">Habis</span>`;
                 
                 tableRows += `
                     <tr style="${!sessionAvailable ? 'opacity: 0.4;' : ''}">
                         <td class="text-start">${s.session}</td>
-                        <td class="text-center">${s.track}</td>
+                        <td class="text-center">${s.track || '-'}</td>
                         <td class="text-end">${statusBadge}</td>
                     </tr>
                 `;
             });
 
-            const starHtml = currentCategory === 'mg' 
+            const starHtml = currentCategory !== 'akb_2shot' 
                 ? `<span class="fs-4 star-btn" style="color: ${starColor};" onclick="toggleFavorite('${memberData.name}')" title="Tandai sebagai Favorit">${starIcon}</span>`
                 : '';
 
             let buyButtonHtml = '';
-            if (currentCategory === '2shot' && isAvailable) {
+            if (currentCategory === 'akb_2shot' && isAvailable) {
                 buyButtonHtml = `
                     <div class="card-footer bg-transparent border-0 px-3 pb-3 pt-0">
                         <a href="https://jkt48.com/purchase/exclusive?code=EXD1A1" target="_blank" class="btn btn-success btn-sm w-100 fw-bold rounded-pill shadow-sm">
@@ -457,7 +455,7 @@
                 </div>
             `;
 
-            if (isFavorite && currentCategory === 'mg') {
+            if (isFavorite && currentCategory !== 'akb_2shot') {
                 favoriteHtml += cardHtml;
             } else {
                 regularHtml += cardHtml;
@@ -465,10 +463,10 @@
         });
 
         let finalRender = '';
-        if (currentCategory === 'mg' && favoriteHtml !== '') {
+        if (currentCategory !== 'akb_2shot' && favoriteHtml !== '') {
             finalRender += `
                 <div class="col-12 mb-3 mt-2">
-                    <h4 class="fw-bold text-warning border-bottom border-warning pb-2 d-inline-block pe-4">⭐ Member Favorit Anda (M&G)</h4>
+                    <h4 class="fw-bold text-warning border-bottom border-warning pb-2 d-inline-block pe-4">⭐ Member Favorit Anda</h4>
                 </div>
                 ${favoriteHtml}`;
             if (regularHtml !== '') {
