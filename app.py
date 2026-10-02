@@ -11,6 +11,16 @@ from mg_monitor import monitor_worker as monitor_mg_worker, get_mg_data
 app = Flask(__name__)
 CORS(app)
 
+# =================================================================
+# JALANKAN BACKGROUND THREAD DI SINI AGAR TERBACA OLEH GUNICORN
+# =================================================================
+t_2shot = threading.Thread(target=monitor_2shot_worker, daemon=True)
+t_2shot.start()
+
+t_mg = threading.Thread(target=monitor_mg_worker, daemon=True)
+t_mg.start()
+# =================================================================
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -26,12 +36,5 @@ def api_mg():
     return jsonify(get_mg_data())
 
 if __name__ == '__main__':
-    # Jalankan background monitoring 2-Shot
-    t_2shot = threading.Thread(target=monitor_2shot_worker, daemon=True)
-    t_2shot.start()
-
-    # Jalankan background monitoring M&G
-    t_mg = threading.Thread(target=monitor_mg_worker, daemon=True)
-    t_mg.start()
-
+    # Blok ini hanya akan berjalan jika Anda tes lokal dengan 'python app.py'
     app.run(host='0.0.0.0', port=5000)
