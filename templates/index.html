@@ -3,33 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JKT48 Event Monitor</title>
+    <title>JKT48 Ticket Monitor</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #121212; color: #ffffff; padding-top: 2rem; padding-bottom: 2rem; }
-        .accordion-button { background-color: #2b2b2b !important; color: white !important; box-shadow: none !important; }
-        .accordion-button:not(.collapsed) { background-color: #dc3545 !important; color: white !important; }
+        body { background-color: #0f1115; color: #ffffff; padding-top: 2rem; padding-bottom: 2rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .card-header-custom { background-color: #1a1d24; border-bottom: 1px solid #2d323b; }
+        .accordion-button { background-color: #1a1d24 !important; color: white !important; box-shadow: none !important; border-bottom: 1px solid #2d323b; }
+        .accordion-button:not(.collapsed) { background-color: #242833 !important; color: white !important; }
         .accordion-button::after { filter: invert(1); }
-        .table-dark { --bs-table-bg: #1e1e1e; margin-bottom: 0; }
+        .accordion-item { border: none; margin-bottom: 8px; border-radius: 8px !important; overflow: hidden; background-color: #1a1d24; transition: all 0.2s ease-in-out; }
+        
+        /* Highlight khusus untuk member yang memiliki tiket */
+        .has-tickets { border-left: 4px solid #198754; box-shadow: 0 4px 12px rgba(25, 135, 84, 0.15); }
+        .sold-out-item { opacity: 0.65; border-left: 4px solid #6c757d; }
+        .sold-out-item:hover { opacity: 1; }
+
+        .table-dark { --bs-table-bg: transparent; margin-bottom: 0; }
+        .table-dark td, .table-dark th { border-color: #2d323b; color: #e1e4e8; }
+        
+        .search-box { background-color: #1a1d24; border: 1px solid #2d323b; color: white; border-radius: 20px; padding: 10px 20px; }
+        .search-box:focus { background-color: #242833; border-color: #dc3545; color: white; box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25); }
+        
+        .btn-custom-active { background-color: #dc3545; color: white; font-weight: 600; border: none; }
+        .btn-custom-inactive { background-color: #1a1d24; color: #adb5bd; border: 1px solid #2d323b; }
+        .btn-custom-inactive:hover { background-color: #242833; color: white; }
     </style>
 </head>
 <body>
 
 <div class="container" style="max-width: 800px;">
-    <h2 class="text-center mb-4">🎫 JKT48 Ticket Monitor</h2>
-
-    <div class="d-flex justify-content-center gap-3 mb-4">
-        <button id="btn-2shot" class="btn btn-danger active" onclick="switchCategory('2shot')">📸 2-Shot</button>
-        <button id="btn-mg" class="btn btn-outline-danger" onclick="switchCategory('mg')">🤝 Meet & Greet</button>
+    <div class="d-flex align-items-center justify-content-center mb-4 gap-2">
+        <h2 class="m-0 fw-bold">🎫 JKT48 Monitor</h2>
     </div>
 
-    <div class="alert alert-secondary text-center" role="alert">
-        Total Kuota Tersedia: <span id="total-quota" class="fw-bold fs-5 text-success">0</span> Tiket <br>
-        <small class="text-muted">Pembaruan Terakhir: <span id="last-update">-</span></small>
+    <!-- Toggle Kategori -->
+    <div class="d-flex justify-content-center gap-2 mb-4">
+        <button id="btn-2shot" class="btn btn-custom-active px-4 rounded-pill" onclick="switchCategory('2shot')">📸 2-Shot</button>
+        <button id="btn-mg" class="btn btn-custom-inactive px-4 rounded-pill" onclick="switchCategory('mg')">🤝 Meet & Greet</button>
     </div>
 
+    <!-- Info Box -->
+    <div class="card card-header-custom border-0 rounded-4 mb-4 shadow-sm">
+        <div class="card-body text-center">
+            <h5 class="text-muted mb-1 fs-6">Total Kuota Tersedia</h5>
+            <div class="display-4 fw-bold text-success mb-2" id="total-quota">0</div>
+            <small class="text-muted">Update terakhir: <span id="last-update" class="fw-medium text-white">-</span></small>
+        </div>
+    </div>
+
+    <!-- Kontrol UX: Search & Filter -->
+    <div class="row g-3 mb-4 align-items-center">
+        <div class="col-md-8">
+            <input type="text" id="searchBox" class="form-control search-box w-100" placeholder="Cari nama member (misal: Grace, Marsha)..." onkeyup="applyFilters()">
+        </div>
+        <div class="col-md-4">
+            <div class="form-check form-switch d-flex align-items-center justify-content-md-end gap-2 m-0">
+                <input class="form-check-input fs-4 m-0" type="checkbox" role="switch" id="availableOnlyToggle" onchange="applyFilters()">
+                <label class="form-check-label text-muted" style="padding-top: 2px;" for="availableOnlyToggle">Hanya Tersedia</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Container -->
     <div class="accordion" id="data-container">
-        <div class="text-center py-4">Memuat data...</div>
+        <div class="text-center py-5 text-muted">
+            <div class="spinner-border text-danger mb-3" role="status"></div>
+            <div>Menyinkronkan data...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container untuk Notifikasi Restock -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="restockToast" class="toast text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header bg-success text-white border-0">
+            <strong class="me-auto">🚨 Restock Alert!</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body fw-medium" id="toastMessage">
+            Tiket baru tersedia.
+        </div>
     </div>
 </div>
 
@@ -38,6 +91,8 @@
 <script>
     let currentCategory = '2shot';
     let fetchInterval;
+    let rawData = [];
+    let lastQuotaState = {}; 
 
     function switchCategory(category) {
         currentCategory = category;
@@ -45,92 +100,149 @@
         const btnMg = document.getElementById('btn-mg');
         
         if (category === '2shot') {
-            btn2shot.className = 'btn btn-danger active';
-            btnMg.className = 'btn btn-outline-danger';
+            btn2shot.className = 'btn btn-custom-active px-4 rounded-pill';
+            btnMg.className = 'btn btn-custom-inactive px-4 rounded-pill';
         } else {
-            btn2shot.className = 'btn btn-outline-danger';
-            btnMg.className = 'btn btn-danger active';
+            btn2shot.className = 'btn btn-custom-inactive px-4 rounded-pill';
+            btnMg.className = 'btn btn-custom-active px-4 rounded-pill';
         }
 
-        document.getElementById('data-container').innerHTML = '<div class="text-center py-4">Memuat data...</div>';
+        document.getElementById('data-container').innerHTML = `
+            <div class="text-center py-5 text-muted">
+                <div class="spinner-border text-danger mb-3" role="status"></div>
+                <div>Memuat data ${category === '2shot' ? '2-Shot' : 'Meet & Greet'}...</div>
+            </div>`;
+        lastQuotaState = {}; // Reset state notifikasi saat ganti tab
         fetchData();
     }
 
     async function fetchData() {
-        // Pemilihan API Relatif otomatis menyesuaikan domain / port aplikasi berjalan
         const endpoint = currentCategory === '2shot' ? '/api/status' : '/api/mg';
         
         try {
             const response = await fetch(endpoint);
             const data = await response.json();
-            renderData(data);
+            
+            // Update Header Info
+            document.getElementById('total-quota').innerText = data.total_quota || 0;
+            if (data.last_check) {
+                const date = new Date(data.last_check * 1000);
+                document.getElementById('last-update').innerText = date.toLocaleTimeString('id-ID');
+            }
+
+            if (!data.members || data.members.length === 0) {
+                document.getElementById('data-container').innerHTML = '<div class="text-center py-5 text-muted">Sedang menunggu data dari server JKT48...</div>';
+                return;
+            }
+
+            processRawData(data.members);
         } catch (error) {
-            console.error("Gagal mengambil data dari API:", error);
-            document.getElementById('data-container').innerHTML = '<div class="text-center py-4 text-danger">Gagal terhubung ke server.</div>';
+            console.error("Fetch error:", error);
         }
     }
 
-    function renderData(data) {
-        document.getElementById('total-quota').innerText = data.total_quota || 0;
-        if (data.last_check) {
-            const date = new Date(data.last_check * 1000);
-            document.getElementById('last-update').innerText = date.toLocaleTimeString('id-ID');
-        }
+    function processRawData(members) {
+        const grouped = {};
+        const currentQuotaState = {};
 
+        members.forEach(m => {
+            if (!grouped[m.name]) {
+                grouped[m.name] = { name: m.name, totalQuota: 0, sessions: [] };
+            }
+            grouped[m.name].sessions.push(m);
+            grouped[m.name].totalQuota += m.quota;
+        });
+
+        rawData = Object.values(grouped);
+
+        // Cek notifikasi restock
+        let restockMessages = [];
+        rawData.forEach(member => {
+            currentQuotaState[member.name] = member.totalQuota;
+            
+            // Jika sebelumnya sudah ada data, dan kuota sekarang lebih besar dari sebelumnya
+            if (lastQuotaState[member.name] !== undefined && member.totalQuota > lastQuotaState[member.name]) {
+                const diff = member.totalQuota - lastQuotaState[member.name];
+                restockMessages.push(`<b>${member.name}</b> (+${diff} Tiket)`);
+            }
+        });
+
+        if (restockMessages.length > 0) {
+            showToast(restockMessages.join('<br>'));
+        }
+        lastQuotaState = currentQuotaState;
+
+        applyFilters();
+    }
+
+    function applyFilters() {
+        const searchQuery = document.getElementById('searchBox').value.toLowerCase();
+        const showAvailableOnly = document.getElementById('availableOnlyToggle').checked;
         const container = document.getElementById('data-container');
-        
-        if (!data.members || data.members.length === 0) {
-            container.innerHTML = '<div class="text-center py-4">Belum ada data (atau data sedang diproses bot).</div>';
+
+        // Filter Data
+        let filteredData = rawData.filter(member => {
+            const matchesSearch = member.name.toLowerCase().includes(searchQuery);
+            const matchesAvailability = showAvailableOnly ? member.totalQuota > 0 : true;
+            return matchesSearch && matchesAvailability;
+        });
+
+        // Sort Data: Prioritaskan yang ada tiket, lalu abjad
+        filteredData.sort((a, b) => {
+            if (a.totalQuota > 0 && b.totalQuota === 0) return -1;
+            if (a.totalQuota === 0 && b.totalQuota > 0) return 1;
+            return a.name.localeCompare(b.name);
+        });
+
+        // Render HTML
+        if (filteredData.length === 0) {
+            container.innerHTML = `<div class="text-center py-5 text-muted">Tidak ada member yang cocok dengan pencarian/filter saat ini.</div>`;
             return;
         }
 
-        const groupedByMember = {};
-        data.members.forEach(m => {
-            if (!groupedByMember[m.name]) {
-                groupedByMember[m.name] = { totalQuota: 0, sessions: [] };
-            }
-            groupedByMember[m.name].sessions.push(m);
-            groupedByMember[m.name].totalQuota += m.quota;
-        });
-
-        const sortedNames = Object.keys(groupedByMember).sort();
-
-        let accordionHTML = '';
-        sortedNames.forEach((name, index) => {
-            const memberData = groupedByMember[name];
-            const isAllSoldOut = memberData.totalQuota === 0;
-            const safeId = name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-
-            const totalBadge = isAllSoldOut 
-                ? '<span class="badge bg-secondary ms-auto">Sold Out</span>' 
-                : `<span class="badge bg-success ms-auto">${memberData.totalQuota} Tiket</span>`;
+        let html = '';
+        filteredData.forEach(memberData => {
+            const isAvailable = memberData.totalQuota > 0;
+            const safeId = memberData.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+            
+            const itemClass = isAvailable ? 'has-tickets' : 'sold-out-item';
+            const badgeHtml = isAvailable 
+                ? `<span class="badge bg-success rounded-pill px-3 py-2 ms-auto shadow-sm">${memberData.totalQuota} Tersedia</span>` 
+                : `<span class="badge bg-secondary rounded-pill px-3 py-2 ms-auto">Sold Out</span>`;
 
             let tableRows = '';
             memberData.sessions.forEach(s => {
-                const sessionSoldOut = s.quota === 0;
-                const statusBadge = sessionSoldOut ? '<span class="badge bg-secondary">Habis</span>' : `<span class="badge bg-success">${s.quota}</span>`;
+                const sessionAvailable = s.quota > 0;
+                const statusBadge = sessionAvailable 
+                    ? `<span class="badge bg-success">${s.quota}</span>` 
+                    : `<span class="badge bg-secondary">Habis</span>`;
+                
                 tableRows += `
-                    <tr style="${sessionSoldOut ? 'opacity: 0.5;' : ''}">
-                        <td>${s.session}</td>
+                    <tr style="${!sessionAvailable ? 'opacity: 0.4;' : ''}">
+                        <td class="text-start ps-4">${s.session}</td>
                         <td>${s.track}</td>
-                        <td>${statusBadge}</td>
+                        <td class="text-end pe-4">${statusBadge}</td>
                     </tr>
                 `;
             });
-            
-            accordionHTML += `
-                <div class="accordion-item border-secondary" style="background-color: #1e1e1e;">
+
+            html += `
+                <div class="accordion-item ${itemClass}">
                     <h2 class="accordion-header" id="heading-${safeId}">
-                        <button class="accordion-button collapsed d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${safeId}">
-                            <span class="fw-bold fs-6 me-2">${name}</span> 
-                            ${totalBadge}
+                        <button class="accordion-button collapsed d-flex align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${safeId}">
+                            <span class="fw-bold fs-6 me-2 text-white">${memberData.name}</span> 
+                            ${badgeHtml}
                         </button>
                     </h2>
                     <div id="collapse-${safeId}" class="accordion-collapse collapse" data-bs-parent="#data-container">
-                        <div class="accordion-body p-0">
-                            <table class="table table-dark table-striped text-center align-middle">
-                                <thead>
-                                    <tr><th>Sesi</th><th>Jalur</th><th>Ketersediaan</th></tr>
+                        <div class="accordion-body p-0 pb-2">
+                            <table class="table table-dark table-sm text-center align-middle m-0">
+                                <thead class="text-muted" style="font-size: 0.85rem;">
+                                    <tr>
+                                        <th class="text-start ps-4 fw-normal">Sesi</th>
+                                        <th class="fw-normal">Jalur</th>
+                                        <th class="text-end pe-4 fw-normal">Stok</th>
+                                    </tr>
                                 </thead>
                                 <tbody>
                                     ${tableRows}
@@ -142,11 +254,17 @@
             `;
         });
 
-        container.innerHTML = accordionHTML;
+        container.innerHTML = html;
+    }
+
+    function showToast(message) {
+        document.getElementById('toastMessage').innerHTML = message;
+        const toastEl = document.getElementById('restockToast');
+        const toast = new bootstrap.Toast(toastEl, { delay: 5000 });
+        toast.show();
     }
 
     fetchData();
-    // Refresh otomatis setiap 15 detik
     if (!fetchInterval) {
         fetchInterval = setInterval(fetchData, 15000);
     }
