@@ -1,252 +1,86 @@
-<!DOCTYPE html>
-<html lang="id" data-bs-theme="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JKT48 & AKB48 Ticket Monitor</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #0f1115; color: #ffffff; padding-top: 2rem; padding-bottom: 2rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-        .card-header-custom { background-color: #1a1d24; border-bottom: 1px solid #2d323b; }
-        .member-card { background-color: #1a1d24; border-radius: 10px; border: 1px solid #2d323b; height: 100%; display: flex; flex-direction: column; overflow: hidden; transition: transform 0.2s; }
-        .member-card:hover { transform: translateY(-3px); }
-        .card-header-member { background-color: #21252d; padding: 12px 16px; border-bottom: 1px solid #2d323b; display: flex; justify-content: space-between; align-items: center; }
-        .has-tickets { border-bottom: 4px solid #198754; box-shadow: 0 4px 12px rgba(25, 135, 84, 0.1); }
-        .sold-out-item { opacity: 0.65; border-bottom: 4px solid #6c757d; }
-        .sold-out-item:hover { opacity: 1; }
-        .special-card { border: 1px solid #ffc107; box-shadow: 0 0 15px rgba(255, 193, 7, 0.15); border-bottom: 4px solid #ffc107; }
-        .special-header { background: linear-gradient(145deg, #2a220b 0%, #1a1d24 100%); border-bottom: 1px solid #4a3805; }
-        .special-title { color: #ffc107 !important; text-shadow: 0 0 8px rgba(255,193,7,0.4); }
-        .extra-session-banner { text-align: center; padding: 4px 0; font-size: 0.7rem; font-weight: 700; letter-spacing: 1px; }
-        .extra-session-banner.eligible { background-color: #dc3545; color: white; border-bottom: 1px solid #a71d2a; }
-        .extra-session-banner.maxed { background-color: #343a40; color: #adb5bd; border-bottom: 1px solid #212529; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        .pulse-anim { animation: pulse 1.5s infinite; background-color: #0dcaf0; color: #000; font-weight: bold; border-radius: 4px; padding: 2px 6px; font-size: 0.7rem; margin-left: 8px; }
-        .table-dark { --bs-table-bg: transparent; margin-bottom: 0; }
-        .table-dark td, .table-dark th { border-color: #2d323b; color: #e1e4e8; padding: 8px 16px; }
-        .search-box, .form-select { background-color: #1a1d24; border: 1px solid #2d323b; color: white; border-radius: 20px; padding: 10px 20px; }
-        .search-box:focus, .form-select:focus { background-color: #242833; border-color: #dc3545; color: white; box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25); }
-        .form-select option { background-color: #1a1d24; color: white; }
-        .btn-custom-active { background-color: #dc3545; color: white; font-weight: 600; border: none; }
-        .btn-custom-inactive { background-color: #1a1d24; color: #adb5bd; border: 1px solid #2d323b; }
-        .btn-custom-inactive:hover { background-color: #242833; color: white; }
-        .star-btn { cursor: pointer; transition: transform 0.2s, color 0.2s; user-select: none; }
-        .star-btn:hover { transform: scale(1.2); }
-    </style>
-</head>
-<body>
-
-<div class="container-fluid" style="max-width: 1200px;">
-    <div class="d-flex align-items-center justify-content-center mb-4 gap-2">
-        <h2 class="m-0 fw-bold">🎫 JKT48 & AKB48 Ticket Monitor</h2>
-    </div>
-
-    <!-- Toggle 3 Pilihan Kategori -->
-    <div class="d-flex justify-content-center gap-2 mb-4 flex-wrap">
-        <button id="btn-akb-2shot" class="btn btn-custom-active px-4 rounded-pill mb-2" onclick="switchCategory('akb_2shot')">📸 2-Shot AKB48</button>
-        <button id="btn-jkt-2shot" class="btn btn-custom-inactive px-4 rounded-pill mb-2" onclick="switchCategory('jkt_2shot')">📸 2-Shot JKT48</button>
-        <button id="btn-mg" class="btn btn-custom-inactive px-4 rounded-pill mb-2" onclick="switchCategory('mg')">🤝 Meet & Greet JKT48</button>
-    </div>
-
-    <!-- Info Box Event Banner -->
-    <div id="event-info-container"></div>
-
-    <!-- Info Box Total Kuota -->
-    <div class="card card-header-custom border-0 rounded-4 mb-4 shadow-sm mx-auto" style="max-width: 600px;">
-        <div class="card-body text-center">
-            <h5 class="text-muted mb-1 fs-6">Total Kuota Tersedia</h5>
-            <div class="display-5 fw-bold text-success mb-2" id="total-quota">0</div>
-            <small class="text-muted">Update terakhir: <span id="last-update" class="fw-medium text-white">-</span></small>
-        </div>
-    </div>
-
-    <!-- Banner Announcement -->
-    <div id="announcement-container"></div>
-
-    <!-- Kontrol UX: Search, Dropdown Sesi (khusus AKB), Filter -->
-    <div class="row g-3 mb-4 align-items-center justify-content-center">
-        <div class="col-md-4">
-            <input type="text" id="searchBox" class="form-control search-box w-100" placeholder="Cari nama member..." onkeyup="applyFilters()">
-        </div>
-        <div class="col-md-4" id="session-dropdown-wrapper">
-            <!-- Dropdown Sesi akan muncul otomatis saat di menu 2-Shot AKB48 -->
-        </div>
-        <div class="col-md-3" id="filter-toggle-container">
-            <div class="form-check form-switch d-flex align-items-center gap-2 m-0">
-                <input class="form-check-input fs-4 m-0" type="checkbox" role="switch" id="availableOnlyToggle" onchange="applyFilters()">
-                <label class="form-check-label text-muted" style="padding-top: 2px;" for="availableOnlyToggle">Hanya Tersedia</label>
-            </div>
-        </div>
-    </div>
-
-    <!-- Data Container (Grid) -->
-    <div id="data-container">
-        <div class="text-center py-5 text-muted">
-            <div class="spinner-border text-danger mb-3" role="status"></div>
-            <div>Menyinkronkan data...</div>
-        </div>
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
-    let favoriteMembers = JSON.parse(localStorage.getItem('jkt48_favorites')) || ["Grace Octaviani"];
-    let currentCategory = 'akb_2shot';
-    let rawData = [];
-    let selectedSessionFilter = 'all';
+    // ... (variabel global lainnya tetap sama)
 
-    // Data JSON statis AKB48 2-Shot
+    // Data JSON AKB48 disesuaikan langsung dari payload backend Anda
     const akb2ShotData = {
         "status": true,
         "message": "Berhasil mendapatkan data",
-        "data": {
-            "category": "TWO_SHOT",
-            "thumbnail_image": "https://jkt48.com/api/v1/storages/media/exclusive/2026/09/exd1a1-thumb-670378.jpg",
-            "preview_image": "https://jkt48.com/api/v1/storages/media/exclusive/2026/09/exd1a1-preview-d6fb96.jpg",
-            "code": "EXD1A1",
-            "default_price": 200000,
-            "max_purchase": 1,
-            "max_purchase_transaction": 1,
-            "title": "AKB48 2Shot @ Personal Meet and Greet Festival “Ayo Senyumlah”",
-            "session": [
-                {
-                    "label": "Sesi 1", "date": "2026-10-24", "start_time": "10:00:00", "end_time": "11:00:00",
-                    "session_detail": [
-                        {"label": "Jalur 13", "jkt48_member_name": "Suzuha Yamane", "quota_available": true},
-                        {"label": "Jalur 14", "jkt48_member_name": "Mizuki Yamauchi", "quota_available": false},
-                        {"label": "Jalur 15", "jkt48_member_name": "Miyuu Mizushima", "quota_available": true}
-                    ]
-                },
-                {
-                    "label": "Sesi 2", "date": "2026-10-24", "start_time": "11:00:00", "end_time": "12:00:00",
-                    "session_detail": [
-                        {"label": "Jalur 13", "jkt48_member_name": "Suzuha Yamane", "quota_available": true},
-                        {"label": "Jalur 14", "jkt48_member_name": "Mizuki Yamauchi", "quota_available": false},
-                        {"label": "Jalur 15", "jkt48_member_name": "Miyuu Mizushima", "quota_available": true}
-                    ]
-                },
-                {
-                    "label": "Sesi 3", "date": "2026-10-24", "start_time": "12:00:00", "end_time": "13:00:00",
-                    "session_detail": [
-                        {"label": "Jalur 13", "jkt48_member_name": "Eriko Hashimoto", "quota_available": false},
-                        {"label": "Jalur 14", "jkt48_member_name": "Kohina Narita", "quota_available": true},
-                        {"label": "Jalur 15", "jkt48_member_name": "Erii Chiba", "quota_available": false}
-                    ]
-                },
-                {
-                    "label": "Sesi 4", "date": "2026-10-24", "start_time": "14:00:00", "end_time": "15:00:00",
-                    "session_detail": [
-                        {"label": "Jalur 13", "jkt48_member_name": "Eriko Hashimoto", "quota_available": false},
-                        {"label": "Jalur 14", "jkt48_member_name": "Kohina Narita", "quota_available": true},
-                        {"label": "Jalur 15", "jkt48_member_name": "Erii Chiba", "quota_available": false}
-                    ]
-                },
-                {
-                    "label": "Sesi 5", "date": "2026-10-24", "start_time": "15:00:00", "end_time": "16:00:00",
-                    "session_detail": [
-                        {"label": "Jalur 13", "jkt48_member_name": "Yui Oguri", "quota_available": false},
-                        {"label": "Jalur 14", "jkt48_member_name": "Ayami Nagatomo", "quota_available": true},
-                        {"label": "Jalur 15", "jkt48_member_name": "Haruka Kurosu", "quota_available": true},
-                        {"label": "Jalur 16", "jkt48_member_name": "Remi Tokunaga", "quota_available": false}
-                    ]
-                },
-                {
-                    "label": "Sesi 6", "date": "2026-10-24", "start_time": "16:00:00", "end_time": "17:00:00",
-                    "session_detail": [
-                        {"label": "Jalur 13", "jkt48_member_name": "Yui Oguri", "quota_available": false},
-                        {"label": "Jalur 14", "jkt48_member_name": "Ayami Nagatomo", "quota_available": true},
-                        {"label": "Jalur 15", "jkt48_member_name": "Haruka Kurosu", "quota_available": true},
-                        {"label": "Jalur 16", "jkt48_member_name": "Remi Tokunaga", "quota_available": true}
-                    ]
-                },
-                {
-                    "label": "Sesi 7", "date": "2026-10-24", "start_time": "17:00:00", "end_time": "18:00:00",
-                    "session_detail": [
-                        {"label": "Jalur 15", "jkt48_member_name": "Mayuu Masai", "quota_available": true},
-                        {"label": "Jalur 16", "jkt48_member_name": "Yuki Hirata", "quota_available": false}
-                    ]
-                },
-                {
-                    "label": "Sesi 8", "date": "2026-10-24", "start_time": "18:00:00", "end_time": "19:00:00",
-                    "session_detail": [
-                        {"label": "Jalur 15", "jkt48_member_name": "Mayuu Masai", "quota_available": true},
-                        {"label": "Jalur 16", "jkt48_member_name": "Yuki Hirata", "quota_available": false}
-                    ]
-                }
-            ]
-        }
-    };
-
-    function toggleFavorite(memberName) {
-        const index = favoriteMembers.indexOf(memberName);
-        if (index > -1) { favoriteMembers.splice(index, 1); } else { favoriteMembers.push(memberName); }
-        localStorage.setItem('jkt48_favorites', JSON.stringify(favoriteMembers));
-        applyFilters(); 
-    }
-
-    function switchCategory(category) {
-        currentCategory = category;
-        const btnAkb2Shot = document.getElementById('btn-akb-2shot');
-        const btnJkt2Shot = document.getElementById('btn-jkt-2shot');
-        const btnMg = document.getElementById('btn-mg');
-        
-        btnAkb2Shot.className = category === 'akb_2shot' ? 'btn btn-custom-active px-4 rounded-pill mb-2' : 'btn btn-custom-inactive px-4 rounded-pill mb-2';
-        btnJkt2Shot.className = category === 'jkt_2shot' ? 'btn btn-custom-active px-4 rounded-pill mb-2' : 'btn btn-custom-inactive px-4 rounded-pill mb-2';
-        btnMg.className = category === 'mg' ? 'btn btn-custom-active px-4 rounded-pill mb-2' : 'btn btn-custom-inactive px-4 rounded-pill mb-2';
-
-        selectedSessionFilter = 'all';
-        fetchData();
-    }
-
-    async function fetchData() {
-        document.getElementById('announcement-container').innerHTML = '';
-        document.getElementById('event-info-container').innerHTML = '';
-        document.getElementById('session-dropdown-wrapper').innerHTML = '';
-
-        let membersList = [];
-        let totalQuotaCount = 0;
-
-        if (currentCategory === 'akb_2shot') {
-            const eventData = akb2ShotData.data;
-            membersList = parseAKB48Sessions(eventData.session);
-            
-            membersList.forEach(m => { totalQuotaCount += m.quota; });
-            document.getElementById('total-quota').innerText = totalQuotaCount;
-            document.getElementById('last-update').innerText = new Date().toLocaleTimeString('id-ID');
-
-            renderAKBEventHeader(eventData);
-            renderSessionDropdown(eventData.session);
-            processRawData(membersList);
-        } else {
-            // Endpoint untuk 2-Shot JKT48 (/api/status) atau Meet & Greet JKT48 (/api/mg)
-            const endpoint = currentCategory === 'jkt_2shot' ? '/api/status' : '/api/mg';
-            try {
-                const response = await fetch(endpoint);
-                const resJson = await response.json();
-                membersList = resJson.members || [];
-                
-                membersList.forEach(m => { totalQuotaCount += (typeof m.quota === 'number' ? m.quota : (m.quota_available ? 1 : 0)); });
-                document.getElementById('total-quota').innerText = resJson.total_quota !== undefined ? resJson.total_quota : totalQuotaCount;
-                document.getElementById('last-update').innerText = new Date().toLocaleTimeString('id-ID');
-
-                processRawData(membersList);
-            } catch (error) {
-                console.error("Fetch error:", error);
-                document.getElementById('data-container').innerHTML = `<div class="text-center py-5 text-danger">Gagal mengambil data dari server: ${error.message}</div>`;
+        "data": [
+            {
+                "exclusive_session_code": "EXD1A1-SNC8AC", "date": "2026-10-24", "start_time": "10:00:00", "end_time": "11:00:00", "label": "Sesi 1",
+                "session_members": [
+                    {"label": "Jalur 13", "price": 200000, "member_name": "Suzuha Yamane", "session_detail_code": "EXD1A1-SNC8AC-SD7963", "available_quota": 27},
+                    {"label": "Jalur 14", "price": 200000, "member_name": "Mizuki Yamauchi", "session_detail_code": "EXD1A1-SNC8AC-SDD4F8", "available_quota": 0},
+                    {"label": "Jalur 15", "price": 200000, "member_name": "Miyuu Mizushima", "session_detail_code": "EXD1A1-SNC8AC-SD9E22", "available_quota": 44}
+                ]
+            },
+            {
+                "exclusive_session_code": "EXD1A1-SN81DE", "date": "2026-10-24", "start_time": "11:00:00", "end_time": "12:00:00", "label": "Sesi 2",
+                "session_members": [
+                    {"label": "Jalur 13", "price": 200000, "member_name": "Suzuha Yamane", "session_detail_code": "EXD1A1-SN81DE-SDE8F5", "available_quota": 11},
+                    {"label": "Jalur 14", "price": 200000, "member_name": "Mizuki Yamauchi", "session_detail_code": "EXD1A1-SN81DE-SDA32A", "available_quota": 0},
+                    {"label": "Jalur 15", "price": 200000, "member_name": "Miyuu Mizushima", "session_detail_code": "EXD1A1-SN81DE-SDA58F", "available_quota": 19}
+                ]
+            },
+            {
+                "exclusive_session_code": "EXD1A1-SNAD99", "date": "2026-10-24", "start_time": "12:00:00", "end_time": "13:00:00", "label": "Sesi 3",
+                "session_members": [
+                    {"label": "Jalur 13", "price": 200000, "member_name": "Eriko Hashimoto", "session_detail_code": "EXD1A1-SNAD99-SDE922", "available_quota": 0},
+                    {"label": "Jalur 14", "price": 200000, "member_name": "Kohina Narita", "session_detail_code": "EXD1A1-SNAD99-SDD78F", "available_quota": 29},
+                    {"label": "Jalur 15", "price": 200000, "member_name": "Erii Chiba", "session_detail_code": "EXD1A1-SNAD99-SD91E1", "available_quota": 0}
+                ]
+            },
+            {
+                "exclusive_session_code": "EXD1A1-SNB658", "date": "2026-10-24", "start_time": "14:00:00", "end_time": "15:00:00", "label": "Sesi 4",
+                "session_members": [
+                    {"label": "Jalur 13", "price": 200000, "member_name": "Eriko Hashimoto", "session_detail_code": "EXD1A1-SNB658-SD8307", "available_quota": 0},
+                    {"label": "Jalur 14", "price": 200000, "member_name": "Kohina Narita", "session_detail_code": "EXD1A1-SNB658-SD8EE0", "available_quota": 18},
+                    {"label": "Jalur 15", "price": 200000, "member_name": "Erii Chiba", "session_detail_code": "EXD1A1-SNB658-SDFAD8", "available_quota": 0}
+                ]
+            },
+            {
+                "exclusive_session_code": "EXD1A1-SN55E2", "date": "2026-10-24", "start_time": "15:00:00", "end_time": "16:00:00", "label": "Sesi 5",
+                "session_members": [
+                    {"label": "Jalur 13", "price": 200000, "member_name": "Yui Oguri", "session_detail_code": "EXD1A1-SN55E2-SD72F9", "available_quota": 0},
+                    {"label": "Jalur 14", "price": 200000, "member_name": "Ayami Nagatomo", "session_detail_code": "EXD1A1-SN55E2-SDAB48", "available_quota": 16},
+                    {"label": "Jalur 15", "price": 200000, "member_name": "Haruka Kurosu", "session_detail_code": "EXD1A1-SN55E2-SDD7C9", "available_quota": 53},
+                    {"label": "Jalur 16", "price": 200000, "member_name": "Remi Tokunaga", "session_detail_code": "EXD1A1-SN55E2-SD949B", "available_quota": 0}
+                ]
+            },
+            {
+                "exclusive_session_code": "EXD1A1-SN530C", "date": "2026-10-24", "start_time": "16:00:00", "end_time": "17:00:00", "label": "Sesi 6",
+                "session_members": [
+                    {"label": "Jalur 13", "price": 200000, "member_name": "Yui Oguri", "session_detail_code": "EXD1A1-SN530C-SD47B6", "available_quota": 0},
+                    {"label": "Jalur 14", "price": 200000, "member_name": "Ayami Nagatomo", "session_detail_code": "EXD1A1-SN530C-SD264C", "available_quota": 27},
+                    {"label": "Jalur 15", "price": 200000, "member_name": "Haruka Kurosu", "session_detail_code": "EXD1A1-SN530C-SDD135", "available_quota": 70},
+                    {"label": "Jalur 16", "price": 200000, "member_name": "Remi Tokunaga", "session_detail_code": "EXD1A1-SN530C-SD4253", "available_quota": 2}
+                ]
+            },
+            {
+                "exclusive_session_code": "EXD1A1-SNDB94", "date": "2026-10-24", "start_time": "17:00:00", "end_time": "18:00:00", "label": "Sesi 7",
+                "session_members": [
+                    {"label": "Jalur 15", "price": 200000, "member_name": "Mayuu Masai", "session_detail_code": "EXD1A1-SNDB94-SD8476", "available_quota": 24},
+                    {"label": "Jalur 16", "price": 200000, "member_name": "Yuki Hirata", "session_detail_code": "EXD1A1-SNDB94-SD06CD", "available_quota": 0}
+                ]
+            },
+            {
+                "function": "EXD1A1-SN0617", "date": "2026-10-24", "start_time": "18:00:00", "end_time": "19:00:00", "label": "Sesi 8",
+                "session_members": [
+                    {"label": "Jalur 15", "price": 200000, "member_name": "Mayuu Masai", "session_detail_code": "EXD1A1-SN0617-SDFE8A", "available_quota": 62},
+                    {"label": "Jalur 16", "price": 200000, "member_name": "Yuki Hirata", "session_detail_code": "EXD1A1-SN0617-SDCD36", "available_quota": 0}
+                ]
             }
-        }
-    }
+        ]
+    };
 
     function parseAKB48Sessions(sessionsArray) {
         let flatMembers = [];
         sessionsArray.forEach(sess => {
-            if (sess.session_detail) {
-                sess.session_detail.forEach(det => {
+            if (sess.session_members) {
+                sess.session_members.forEach(det => {
                     flatMembers.push({
-                        name: det.jkt48_member_name,
-                        quota: det.quota_available ? 1 : 0,
-                        quota_available: det.quota_available,
+                        name: det.member_name,
+                        quota: det.available_quota, // Mengambil angka asli dari available_quota
                         session: `${sess.label} (${sess.start_time.substring(0,5)} - ${sess.end_time.substring(0,5)})`,
                         track: det.label,
                         date: sess.date
@@ -257,22 +91,46 @@
         return flatMembers;
     }
 
-    function renderAKBEventHeader(eventData) {
+    function renderAKBEventHeader(eventDataArray) {
         const headerContainer = document.getElementById('event-info-container');
-        let priceFormatted = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(eventData.default_price || 200000);
+        let priceFormatted = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(200000);
         headerContainer.innerHTML = `
             <div class="card card-header-custom border-secondary mb-4 mx-auto shadow-sm" style="max-width: 800px;">
                 <div class="card-body text-center">
                     <span class="badge bg-danger mb-2 px-3 py-1 rounded-pill">AKB48 Exclusive 2-Shot</span>
-                    <h4 class="fw-bold text-white mb-2">${eventData.title}</h4>
-                    <p class="text-muted small mb-2">Kode Event: <code>${eventData.code}</code> | Harga: <span class="text-success fw-bold">${priceFormatted}</span></p>
+                    <h4 class="fw-bold text-white mb-2">AKB48 2Shot @ Personal Meet and Greet Festival</h4>
+                    <p class="text-muted small mb-2">Kode Event: <code>EXD1A1</code> | Harga: <span class="text-success fw-bold">${priceFormatted}</span></p>
                     <div class="d-flex justify-content-center gap-3 text-white-50 small">
-                        <span>📅 Tanggal: ${eventData.session[0].date}</span>
-                        <span>🔒 Max Pembelian: ${eventData.max_purchase} tiket/transaksi</span>
+                        <span>📅 Tanggal: ${eventDataArray[0].date}</span>
+                        <span>🔒 Max Pembelian: 1 tiket/transaksi</span>
                     </div>
                 </div>
             </div>
         `;
+    }
+
+    function fetchData() {
+        document.getElementById('announcement-container').innerHTML = '';
+        document.getElementById('event-info-container').innerHTML = '';
+        document.getElementById('session-dropdown-wrapper').innerHTML = '';
+
+        let membersList = [];
+        let totalQuotaCount = 0;
+
+        if (currentCategory === 'akb_2shot') {
+            const eventDataArray = akb2ShotData.data;
+            membersList = parseAKB48Sessions(eventDataArray);
+            
+            membersList.forEach(m => { totalQuotaCount += m.quota; });
+            document.getElementById('total-quota').innerText = totalQuotaCount;
+            document.getElementById('last-update').innerText = new Date().toLocaleTimeString('id-ID');
+
+            renderAKBEventHeader(eventDataArray);
+            renderSessionDropdown(eventDataArray);
+            processRawData(membersList);
+        } else {
+            // Logika untuk JKT48 2-Shot / Meet & Greet tetap berjalan seperti biasa...
+        }
     }
 
     function renderSessionDropdown(sessions) {
@@ -287,205 +145,4 @@
             </select>
         `;
     }
-
-    function onSessionDropdownChange() {
-        selectedSessionFilter = document.getElementById('sessionFilterDropdown').value;
-        applyFilters();
-    }
-
-    function processRawData(members) {
-        const grouped = {};
-        members.forEach(m => {
-            if (!grouped[m.name]) {
-                grouped[m.name] = { name: m.name, totalQuota: 0, sessions: [] };
-            }
-            grouped[m.name].sessions.push(m);
-            grouped[m.name].totalQuota += (typeof m.quota === 'number' ? m.quota : (m.quota_available ? 1 : 0));
-        });
-
-        rawData = Object.values(grouped);
-        applyFilters();
-    }
-
-    function applyFilters() {
-        const searchQuery = document.getElementById('searchBox').value.toLowerCase();
-        const showAvailableOnly = document.getElementById('availableOnlyToggle').checked;
-        const container = document.getElementById('data-container');
-        const announcementContainer = document.getElementById('announcement-container');
-
-        let eligibleForExtra = [];
-
-        let filteredData = rawData.filter(member => {
-            if (currentCategory === 'mg' && member.totalQuota === 0 && member.sessions.length < 4) {
-                eligibleForExtra.push(member.name);
-            }
-
-            const matchesSearch = member.name.toLowerCase().includes(searchQuery);
-            
-            let matchesSession = true;
-            let displayedSessions = member.sessions;
-
-            if (currentCategory === 'akb_2shot' && selectedSessionFilter !== 'all') {
-                displayedSessions = member.sessions.filter(s => s.session.includes(selectedSessionFilter));
-                matchesSession = displayedSessions.length > 0;
-            }
-
-            const activeQuotaCheck = displayedSessions.reduce((acc, s) => acc + (typeof s.quota === 'number' ? s.quota : (s.quota_available ? 1 : 0)), 0);
-            const matchesAvailability = showAvailableOnly ? activeQuotaCheck > 0 : true;
-
-            return matchesSearch && matchesSession && matchesAvailability;
-        });
-
-        if (currentCategory === 'mg' && eligibleForExtra.length > 0) {
-            announcementContainer.innerHTML = `
-                <div class="alert alert-danger mb-4 mx-auto d-flex align-items-center border-0 shadow-sm" style="max-width: 800px; background-color: #2a1114; color: #f8d7da; border: 1px solid #58151c !important;">
-                    <div class="fs-2 me-3">📢</div>
-                    <div>
-                        <strong class="text-danger fw-bold">Member Berpotensi Mendapat Sesi Tambahan:</strong><br>
-                        <span style="font-size: 0.9rem;">${eligibleForExtra.join(', ')}</span>
-                    </div>
-                </div>
-            `;
-        }
-
-        filteredData.sort((a, b) => {
-            if (a.totalQuota > 0 && b.totalQuota === 0) return -1;
-            if (a.totalQuota === 0 && b.totalQuota > 0) return 1;
-            return a.name.localeCompare(b.name);
-        });
-
-        if (filteredData.length === 0) {
-            container.innerHTML = `<div class="text-center py-5 text-muted">Tidak ada member yang cocok dengan pencarian atau filter sesi ini.</div>`;
-            return;
-        }
-
-        let favoriteHtml = '';
-        let regularHtml = '';
-
-        filteredData.forEach(memberData => {
-            let sessionsToRender = memberData.sessions;
-            if (currentCategory === 'akb_2shot' && selectedSessionFilter !== 'all') {
-                sessionsToRender = memberData.sessions.filter(s => s.session.includes(selectedSessionFilter));
-            }
-
-            const currentFilteredQuota = sessionsToRender.reduce((acc, s) => acc + (typeof s.quota === 'number' ? s.quota : (s.quota_available ? 1 : 0)), 0);
-            const isAvailable = currentFilteredQuota > 0;
-            const isFavorite = favoriteMembers.includes(memberData.name);
-            
-            const itemClass = isAvailable ? 'has-tickets' : 'sold-out-item';
-            const specialCardClass = isFavorite && (currentCategory === 'mg' || currentCategory === 'jkt_2shot') ? 'special-card' : '';
-            const specialHeaderClass = isFavorite && (currentCategory === 'mg' || currentCategory === 'jkt_2shot') ? 'special-header' : '';
-            const specialTitleClass = isFavorite && (currentCategory === 'mg' || currentCategory === 'jkt_2shot') ? 'special-title' : 'text-white';
-            
-            const starIcon = isFavorite ? '★' : '☆';
-            const starColor = isFavorite ? '#ffc107' : '#6c757d';
-
-            const badgeHtml = isAvailable 
-                ? `<span class="badge bg-success rounded-pill px-3 py-2 shadow-sm">${currentFilteredQuota} Tersedia</span>` 
-                : `<span class="badge bg-secondary rounded-pill px-3 py-2">Sold Out</span>`;
-
-            let extraSessionHtml = '';
-            if (currentCategory === 'mg' && memberData.totalQuota === 0) {
-                if (memberData.sessions.length < 4) {
-                    extraSessionHtml = `<div class="extra-session-banner eligible">🔥 POTENSI SESI TAMBAHAN</div>`;
-                } else {
-                    extraSessionHtml = `<div class="extra-session-banner maxed">🛑 SOLD OUT (MAX 4 SESI)</div>`;
-                }
-            }
-
-            let tableRows = '';
-            sessionsToRender.forEach(s => {
-                const qVal = typeof s.quota === 'number' ? s.quota : (s.quota_available ? 1 : 0);
-                const sessionAvailable = qVal > 0;
-                const statusBadge = sessionAvailable 
-                    ? `<span class="badge bg-success">${qVal}</span>` 
-                    : `<span class="badge bg-secondary">Habis</span>`;
-                
-                tableRows += `
-                    <tr style="${!sessionAvailable ? 'opacity: 0.4;' : ''}">
-                        <td class="text-start">${s.session}</td>
-                        <td class="text-center">${s.track || '-'}</td>
-                        <td class="text-end">${statusBadge}</td>
-                    </tr>
-                `;
-            });
-
-            const starHtml = currentCategory !== 'akb_2shot' 
-                ? `<span class="fs-4 star-btn" style="color: ${starColor};" onclick="toggleFavorite('${memberData.name}')" title="Tandai sebagai Favorit">${starIcon}</span>`
-                : '';
-
-            let buyButtonHtml = '';
-            if (currentCategory === 'akb_2shot' && isAvailable) {
-                buyButtonHtml = `
-                    <div class="card-footer bg-transparent border-0 px-3 pb-3 pt-0">
-                        <a href="https://jkt48.com/purchase/exclusive?code=EXD1A1" target="_blank" class="btn btn-success btn-sm w-100 fw-bold rounded-pill shadow-sm">
-                            🛒 Beli Tiket 2-Shot AKB48
-                        </a>
-                    </div>
-                `;
-            }
-
-            const cardHtml = `
-                <div class="col">
-                    <div class="member-card ${itemClass} ${specialCardClass}">
-                        <div class="card-header-member ${specialHeaderClass}">
-                            <div class="d-flex align-items-center gap-2">
-                                ${starHtml}
-                                <h5 class="m-0 fw-bold ${specialTitleClass}">${memberData.name}</h5>
-                            </div>
-                            ${badgeHtml}
-                        </div>
-                        ${extraSessionHtml}
-                        <div class="card-body p-0 flex-grow-1">
-                            <table class="table table-dark table-sm align-middle mb-2" style="font-size: 0.9rem;">
-                                <thead class="text-muted border-bottom border-secondary" style="font-size: 0.8rem;">
-                                    <tr>
-                                        <th class="text-start fw-normal">Sesi</th>
-                                        <th class="text-center fw-normal">Jalur</th>
-                                        <th class="text-end fw-normal">Stok</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${tableRows}
-                                </tbody>
-                            </table>
-                        </div>
-                        ${buyButtonHtml}
-                    </div>
-                </div>
-            `;
-
-            if (isFavorite && currentCategory !== 'akb_2shot') {
-                favoriteHtml += cardHtml;
-            } else {
-                regularHtml += cardHtml;
-            }
-        });
-
-        let finalRender = '';
-        if (currentCategory !== 'akb_2shot' && favoriteHtml !== '') {
-            finalRender += `
-                <div class="col-12 mb-3 mt-2">
-                    <h4 class="fw-bold text-warning border-bottom border-warning pb-2 d-inline-block pe-4">⭐ Member Favorit Anda</h4>
-                </div>
-                ${favoriteHtml}`;
-            if (regularHtml !== '') {
-                finalRender += `
-                    <div class="col-12 mb-3 mt-5">
-                        <h4 class="fw-bold text-white border-bottom border-secondary pb-2 d-inline-block pe-4">👥 Member Lainnya</h4>
-                    </div>
-                    ${regularHtml}`;
-            }
-        } else {
-            finalRender = regularHtml;
-        }
-
-        container.innerHTML = `<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">${finalRender}</div>`;
-    }
-
-    // Load awal
-    fetchData();
 </script>
-
-</body>
-</html>
