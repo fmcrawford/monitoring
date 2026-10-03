@@ -37,27 +37,28 @@
         <button id="btn-jkt-2shot" class="btn btn-custom-inactive px-4 rounded-pill" onclick="switchCategory('jkt_2shot')">JKT48 2-Shot</button>
     </div>
 
-    <!-- Panel Pengaturan Webhook Discord & Auto-Refresh -->
+    <!-- Panel Pengaturan Webhook Discord & Monitoring Berkala -->
     <div class="card card-header-custom border-0 rounded-4 mb-4 shadow-sm mx-auto" style="max-width: 800px;">
         <div class="card-body">
-            <h6 class="fw-bold mb-3 text-danger">🔔 Pengaturan Discord Webhook & Pantau Berkala</h6>
+            <h6 class="fw-bold mb-3 text-danger">🔔 Pengaturan Discord Webhook & Laporan Rutin</h6>
             <div class="row g-2 align-items-center">
                 <div class="col-md-7">
                     <input type="text" id="discordWebhookInput" class="form-control form-control-sm w-100" placeholder="https://discord.com/api/webhooks/...">
                 </div>
                 <div class="col-md-3">
                     <select id="intervalSelect" class="form-select form-select-sm w-100">
-                        <option value="0">Auto-Check: Mati</option>
-                        <option value="30">Setiap 30 Detik</option>
-                        <option value="60" selected>Setiap 1 Menit</option>
-                        <option value="300">Setiap 5 Menit</option>
+                        <option value="30">Cek: Setiap 30 Detik</option>
+                        <option value="60" selected>Cek: Setiap 1 Menit</option>
+                        <option value="300">Cek: Setiap 5 Menit</option>
                     </select>
                 </div>
                 <div class="col-md-2">
                     <button id="btnToggleMonitor" class="btn btn-outline-success btn-sm w-100 rounded-pill fw-bold" onclick="toggleMonitor()">Mulai</button>
                 </div>
             </div>
-            <div class="form-text text-muted mt-2 small">Masukkan URL Webhook Discord Anda untuk menerima pemberitahuan otomatis saat kuota tiket tersedia/berubah.</div>
+            <div class="form-text text-muted mt-2 small">
+                Sistem mendeteksi perubahan/restock secara berkala sesuai interval di atas, serta mengirimkan **Laporan Rutin otomatis** ke Discord pada pukul **08:00, 12:00, 16:00, dan 20:00 WIB**.
+            </div>
         </div>
     </div>
 
@@ -103,8 +104,10 @@
     let rawData = [];
     let selectedSessionFilter = 'all';
     let monitorTimer = null;
+    let routineCheckTimer = null;
     let isMonitoringActive = false;
     let previousQuotaSnapshot = {};
+    let lastReportedHour = -1;
 
     // Data Statis AKB48 2-Shot
     const akb2ShotData = {
@@ -205,7 +208,6 @@
             }
             processRawData(membersList, isBackgroundCheck);
         } else {
-            // Endpoint untuk 2-Shot JKT48
             try {
                 const response = await fetch('/api/status');
                 const resJson = await response.json();
@@ -216,7 +218,7 @@
                 document.getElementById('last-update').innerText = new Date().toLocaleTimeString('id-ID');
 
                 if (!isBackgroundCheck) {
-                    document.getElementById('event-info-container').innerHTML = '';
+                    renderJKTEventHeader();
                     document.getElementById('session-dropdown-wrapper').innerHTML = '';
                 }
                 processRawData(membersList, isBackgroundCheck);
@@ -265,6 +267,19 @@
         `;
     }
 
+    function renderJKTEventHeader() {
+        const headerContainer = document.getElementById('event-info-container');
+        headerContainer.innerHTML = `
+            <div class="card card-header-custom border-secondary mb-4 mx-auto shadow-sm" style="max-width: 800px;">
+                <div class="card-body text-center">
+                    <span class="badge bg-danger mb-2 px-3 py-1 rounded-pill">JKT48 Exclusive 2-Shot</span>
+                    <h4 class="fw-bold text-white mb-2">JKT48 Personal Meet and Greet Festival - 2-Shot</h4>
+                    <p class="text-muted small mb-2">Kode Event: <code>EX5B99</code></p>
+                </div>
+            </div>
+        `;
+    }
+
     function renderSessionDropdown(sessions) {
         const wrapper = document.getElementById('session-dropdown-wrapper');
         let options = `<option value="all">🌐 Semua Sesi (1 - 8)</option>`;
@@ -295,7 +310,6 @@
 
         rawData = Object.values(grouped);
 
-        // Periksa perubahan stok jika background monitoring aktif
         if (isBackgroundCheck) {
             checkQuotaChangesAndNotify();
         }
@@ -310,7 +324,7 @@
         let changesFound = [];
         rawData.forEach(member => {
             member.sessions.forEach(sess => {
-                let key = `${member.name}_${sess.session}_${sess.track || 'default'}`;
+                let key = `${currentCategory}_${member.name}_${sess.session}_${sess.track || 'default'}`;
                 let oldQuota = previousQuotaSnapshot[key] !== undefined ? previousQuotaSnapshot[key] : sess.quota;
                 
                 if (sess.quota > oldQuota) {
@@ -322,6 +336,30 @@
 
         if (changesFound.length > 0) {
             sendDiscordNotification(webhookUrl, `🚨 **RESTOCK ALERT 2-SHOT (${currentCategory.toUpperCase()})** 🚨\n\n` + changesFound.join('\n'));
+        }
+
+        // Cek laporan rutin otomatis berdasarkan jam (08:00, 12:00, 16:00, 20:00)
+        checkRoutineReport(webhookUrl);
+    }
+
+    function checkRoutineReport(webhookUrl) {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+
+        // Target jam laporan rutin: 8, 12, 16, 20 (dieksekusi pada menit ke-0)
+        const targetHours = [8, 12, 16, 20];
+
+        if (targetHours.includes(currentHour) && currentMinute === 0 && lastReportedHour !== currentHour) {
+            lastReportedHour = currentHour;
+            let totalAvailableAll = 0;
+            rawData.forEach(m => totalAvailableAll += m.totalQuota);
+
+            let reportMsg = `📊 **LAPORAN RUTIN 2-SHOT (${currentCategory.toUpperCase()})** - Pukul ${currentHour}:00 WIB\n`;
+            reportMsg += `Total Kuota Tersedia Saat Ini: **${totalAvailableAll}**\n`;
+            reportMsg += `Pantau langsung melalui website monitor.`;
+
+            sendDiscordNotification(webhookUrl, reportMsg);
         }
     }
 
@@ -343,15 +381,11 @@
                 alert('Silakan masukkan URL Webhook Discord terlebih dahulu!');
                 return;
             }
-            if (intervalVal === 0) {
-                alert('Silakan pilih interval waktu pengecekan otomatis!');
-                return;
-            }
 
-            // Inisialisasi snapshot awal
+            // Inisialisasi snapshot awal saat mulai dipantau dari website
             rawData.forEach(member => {
                 member.sessions.forEach(sess => {
-                    let key = `${member.name}_${sess.session}_${sess.track || 'default'}`;
+                    let key = `${currentCategory}_${member.name}_${sess.session}_${sess.track || 'default'}`;
                     previousQuotaSnapshot[key] = sess.quota;
                 });
             });
@@ -361,6 +395,9 @@
             btn.innerText = "Berhenti";
             document.getElementById('discordWebhookInput').disabled = true;
             document.getElementById('intervalSelect').disabled = true;
+
+            // Kirim notifikasi konfirmasi bahwa monitoring dimulai
+            sendDiscordNotification(webhookUrl, `✅ **Monitor 2-Shot Berhasil Diaktifkan!** Sistem mulai memantau perubahan kuota secara berkala.`);
 
             monitorTimer = setInterval(() => {
                 fetchData(true);
@@ -372,6 +409,8 @@
             btn.innerText = "Mulai";
             document.getElementById('discordWebhookInput').disabled = false;
             document.getElementById('intervalSelect').disabled = false;
+
+            sendDiscordNotification(webhookUrl, `🛑 **Monitor 2-Shot Dinonaktifkan.**`);
         }
     }
 
@@ -439,11 +478,16 @@
             });
 
             let buyButtonHtml = '';
-            if (currentCategory === 'akb_2shot' && isAvailable) {
+            if (isAvailable) {
+                let purchaseUrl = currentCategory === 'akb_2shot' 
+                    ? 'https://jkt48.com/purchase/exclusive?code=EXD1A1' 
+                    : 'https://jkt48.com/purchase/exclusive?code=EX5B99';
+                let buttonText = currentCategory === 'akb_2shot' ? '🛒 Beli Tiket 2-Shot AKB48' : '🛒 Beli Tiket 2-Shot JKT48';
+
                 buyButtonHtml = `
                     <div class="card-footer bg-transparent border-0 px-3 pb-3 pt-0">
-                        <a href="https://jkt48.com/purchase/exclusive?code=EXD1A1" target="_blank" class="btn btn-success btn-sm w-100 fw-bold rounded-pill shadow-sm">
-                            🛒 Beli Tiket 2-Shot AKB48
+                        <a href="${purchaseUrl}" target="_blank" class="btn btn-success btn-sm w-100 fw-bold rounded-pill shadow-sm">
+                            ${buttonText}
                         </a>
                     </div>
                 `;
@@ -479,7 +523,7 @@
         container.innerHTML = `<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">${cardsHtml}</div>`;
     }
 
-    // Inisialisasi awal saat halaman dibuka
+    // Inisialisasi awal saat halaman dimuat
     fetchData();
 </script>
 
