@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JKT48 & AKB48 Ticket Monitor</title>
+    <title>2-Shot Ticket Monitor (AKB48 & JKT48)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background-color: #0f1115; color: #ffffff; padding-top: 2rem; padding-bottom: 2rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -14,36 +14,51 @@
         .has-tickets { border-bottom: 4px solid #198754; box-shadow: 0 4px 12px rgba(25, 135, 84, 0.1); }
         .sold-out-item { opacity: 0.65; border-bottom: 4px solid #6c757d; }
         .sold-out-item:hover { opacity: 1; }
-        .special-card { border: 1px solid #ffc107; box-shadow: 0 0 15px rgba(255, 193, 7, 0.15); border-bottom: 4px solid #ffc107; }
-        .special-header { background: linear-gradient(145deg, #2a220b 0%, #1a1d24 100%); border-bottom: 1px solid #4a3805; }
-        .special-title { color: #ffc107 !important; text-shadow: 0 0 8px rgba(255,193,7,0.4); }
-        .extra-session-banner { text-align: center; padding: 4px 0; font-size: 0.7rem; font-weight: 700; letter-spacing: 1px; }
-        .extra-session-banner.eligible { background-color: #dc3545; color: white; border-bottom: 1px solid #a71d2a; }
-        .extra-session-banner.maxed { background-color: #343a40; color: #adb5bd; border-bottom: 1px solid #212529; }
         .table-dark { --bs-table-bg: transparent; margin-bottom: 0; }
         .table-dark td, .table-dark th { border-color: #2d323b; color: #e1e4e8; padding: 8px 16px; }
-        .search-box, .form-select { background-color: #1a1d24; border: 1px solid #2d323b; color: white; border-radius: 20px; padding: 10px 20px; }
-        .search-box:focus, .form-select:focus { background-color: #242833; border-color: #dc3545; color: white; box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25); }
+        .search-box, .form-select, .form-control { background-color: #1a1d24; border: 1px solid #2d323b; color: white; border-radius: 20px; padding: 10px 20px; }
+        .search-box:focus, .form-select:focus, .form-control:focus { background-color: #242833; border-color: #dc3545; color: white; box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25); }
         .form-select option { background-color: #1a1d24; color: white; }
         .btn-custom-active { background-color: #dc3545; color: white; font-weight: 600; border: none; }
         .btn-custom-inactive { background-color: #1a1d24; color: #adb5bd; border: 1px solid #2d323b; }
         .btn-custom-inactive:hover { background-color: #242833; color: white; }
-        .star-btn { cursor: pointer; transition: transform 0.2s, color 0.2s; user-select: none; }
-        .star-btn:hover { transform: scale(1.2); }
     </style>
 </head>
 <body>
 
 <div class="container-fluid" style="max-width: 1200px;">
     <div class="d-flex align-items-center justify-content-center mb-4 gap-2">
-        <h2 class="m-0 fw-bold">🎫 JKT48 & AKB48 Ticket Monitor</h2>
+        <h2 class="m-0 fw-bold">📸 2-Shot Ticket Monitor (AKB48 & JKT48)</h2>
     </div>
 
-    <!-- Toggle 3 Pilihan Kategori -->
+    <!-- Toggle Kategori 2-Shot -->
     <div class="d-flex justify-content-center gap-2 mb-4 flex-wrap">
-        <button id="btn-akb-2shot" class="btn btn-custom-active px-4 rounded-pill mb-2" onclick="switchCategory('akb_2shot')">📸 2-Shot AKB48</button>
-        <button id="btn-jkt-2shot" class="btn btn-custom-inactive px-4 rounded-pill mb-2" onclick="switchCategory('jkt_2shot')">📸 2-Shot JKT48</button>
-        <button id="btn-mg" class="btn btn-custom-inactive px-4 rounded-pill mb-2" onclick="switchCategory('mg')">🤝 Meet & Greet JKT48</button>
+        <button id="btn-akb-2shot" class="btn btn-custom-active px-4 rounded-pill" onclick="switchCategory('akb_2shot')">AKB48 2-Shot</button>
+        <button id="btn-jkt-2shot" class="btn btn-custom-inactive px-4 rounded-pill" onclick="switchCategory('jkt_2shot')">JKT48 2-Shot</button>
+    </div>
+
+    <!-- Panel Pengaturan Webhook Discord & Auto-Refresh -->
+    <div class="card card-header-custom border-0 rounded-4 mb-4 shadow-sm mx-auto" style="max-width: 800px;">
+        <div class="card-body">
+            <h6 class="fw-bold mb-3 text-danger">🔔 Pengaturan Discord Webhook & Pantau Berkala</h6>
+            <div class="row g-2 align-items-center">
+                <div class="col-md-7">
+                    <input type="text" id="discordWebhookInput" class="form-control form-control-sm w-100" placeholder="https://discord.com/api/webhooks/...">
+                </div>
+                <div class="col-md-3">
+                    <select id="intervalSelect" class="form-select form-select-sm w-100">
+                        <option value="0">Auto-Check: Mati</option>
+                        <option value="30">Setiap 30 Detik</option>
+                        <option value="60" selected>Setiap 1 Menit</option>
+                        <option value="300">Setiap 5 Menit</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button id="btnToggleMonitor" class="btn btn-outline-success btn-sm w-100 rounded-pill fw-bold" onclick="toggleMonitor()">Mulai</button>
+                </div>
+            </div>
+            <div class="form-text text-muted mt-2 small">Masukkan URL Webhook Discord Anda untuk menerima pemberitahuan otomatis saat kuota tiket tersedia/berubah.</div>
+        </div>
     </div>
 
     <!-- Info Box Event Banner -->
@@ -52,22 +67,19 @@
     <!-- Info Box Total Kuota -->
     <div class="card card-header-custom border-0 rounded-4 mb-4 shadow-sm mx-auto" style="max-width: 600px;">
         <div class="card-body text-center">
-            <h5 class="text-muted mb-1 fs-6">Total Kuota Tersedia</h5>
+            <h5 class="text-muted mb-1 fs-6">Total Kuota 2-Shot Tersedia</h5>
             <div class="display-5 fw-bold text-success mb-2" id="total-quota">0</div>
-            <small class="text-muted">Update terakhir: <span id="last-update" class="fw-medium text-white">-</span></small>
+            <small class="text-muted">Pembaruan terakhir: <span id="last-update" class="fw-medium text-white">-</span></small>
         </div>
     </div>
 
-    <!-- Banner Announcement -->
-    <div id="announcement-container"></div>
-
-    <!-- Kontrol UX: Search, Dropdown Sesi, Filter -->
+    <!-- Kontrol: Search, Dropdown Sesi, Filter Tersedia -->
     <div class="row g-3 mb-4 align-items-center justify-content-center">
         <div class="col-md-4">
             <input type="text" id="searchBox" class="form-control search-box w-100" placeholder="Cari nama member..." onkeyup="applyFilters()">
         </div>
         <div class="col-md-4" id="session-dropdown-wrapper"></div>
-        <div class="col-md-3" id="filter-toggle-container">
+        <div class="col-md-3">
             <div class="form-check form-switch d-flex align-items-center gap-2 m-0">
                 <input class="form-check-input fs-4 m-0" type="checkbox" role="switch" id="availableOnlyToggle" onchange="applyFilters()">
                 <label class="form-check-label text-muted" style="padding-top: 2px;" for="availableOnlyToggle">Hanya Tersedia</label>
@@ -75,11 +87,11 @@
         </div>
     </div>
 
-    <!-- Data Container (Grid) -->
+    <!-- Container Konten Grid Member -->
     <div id="data-container">
         <div class="text-center py-5 text-muted">
             <div class="spinner-border text-danger mb-3" role="status"></div>
-            <div>Menyinkronkan data...</div>
+            <div>Memuat data 2-Shot...</div>
         </div>
     </div>
 </div>
@@ -87,11 +99,14 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    let favoriteMembers = JSON.parse(localStorage.getItem('jkt48_favorites')) || ["Grace Octaviani"];
     let currentCategory = 'akb_2shot';
     let rawData = [];
     let selectedSessionFilter = 'all';
+    let monitorTimer = null;
+    let isMonitoringActive = false;
+    let previousQuotaSnapshot = {};
 
+    // Data Statis AKB48 2-Shot
     const akb2ShotData = {
         "status": true,
         "message": "Berhasil mendapatkan data",
@@ -163,28 +178,16 @@
         ]
     };
 
-    function toggleFavorite(memberName) {
-        const index = favoriteMembers.indexOf(memberName);
-        if (index > -1) { favoriteMembers.splice(index, 1); } else { favoriteMembers.push(memberName); }
-        localStorage.setItem('jkt48_favorites', JSON.stringify(favoriteMembers));
-        applyFilters(); 
-    }
-
     function switchCategory(category) {
         currentCategory = category;
-        document.getElementById('btn-akb-2shot').className = category === 'akb_2shot' ? 'btn btn-custom-active px-4 rounded-pill mb-2' : 'btn btn-custom-inactive px-4 rounded-pill mb-2';
-        document.getElementById('btn-jkt-2shot').className = category === 'jkt_2shot' ? 'btn btn-custom-active px-4 rounded-pill mb-2' : 'btn btn-custom-inactive px-4 rounded-pill mb-2';
-        document.getElementById('btn-mg').className = category === 'mg' ? 'btn btn-custom-active px-4 rounded-pill mb-2' : 'btn btn-custom-inactive px-4 rounded-pill mb-2';
+        document.getElementById('btn-akb-2shot').className = category === 'akb_2shot' ? 'btn btn-custom-active px-4 rounded-pill' : 'btn btn-custom-inactive px-4 rounded-pill';
+        document.getElementById('btn-jkt-2shot').className = category === 'jkt_2shot' ? 'btn btn-custom-active px-4 rounded-pill' : 'btn btn-custom-inactive px-4 rounded-pill';
 
         selectedSessionFilter = 'all';
         fetchData();
     }
 
-    async function fetchData() {
-        document.getElementById('announcement-container').innerHTML = '';
-        document.getElementById('event-info-container').innerHTML = '';
-        document.getElementById('session-dropdown-wrapper').innerHTML = '';
-
+    async function fetchData(isBackgroundCheck = false) {
         let membersList = [];
         let totalQuotaCount = 0;
 
@@ -196,13 +199,15 @@
             document.getElementById('total-quota').innerText = totalQuotaCount;
             document.getElementById('last-update').innerText = new Date().toLocaleTimeString('id-ID');
 
-            renderAKBEventHeader(eventDataArray);
-            renderSessionDropdown(eventDataArray);
-            processRawData(membersList);
+            if (!isBackgroundCheck) {
+                renderAKBEventHeader(eventDataArray);
+                renderSessionDropdown(eventDataArray);
+            }
+            processRawData(membersList, isBackgroundCheck);
         } else {
-            const endpoint = currentCategory === 'jkt_2shot' ? '/api/status' : '/api/mg';
+            // Endpoint untuk 2-Shot JKT48
             try {
-                const response = await fetch(endpoint);
+                const response = await fetch('/api/status');
                 const resJson = await response.json();
                 membersList = resJson.members || [];
                 
@@ -210,10 +215,16 @@
                 document.getElementById('total-quota').innerText = resJson.total_quota !== undefined ? resJson.total_quota : totalQuotaCount;
                 document.getElementById('last-update').innerText = new Date().toLocaleTimeString('id-ID');
 
-                processRawData(membersList);
+                if (!isBackgroundCheck) {
+                    document.getElementById('event-info-container').innerHTML = '';
+                    document.getElementById('session-dropdown-wrapper').innerHTML = '';
+                }
+                processRawData(membersList, isBackgroundCheck);
             } catch (error) {
                 console.error("Fetch error:", error);
-                document.getElementById('data-container').innerHTML = `<div class="text-center py-5 text-danger">Gagal mengambil data dari server: ${error.message}</div>`;
+                if (!isBackgroundCheck) {
+                    document.getElementById('data-container').innerHTML = `<div class="text-center py-5 text-danger">Gagal mengambil data dari server: ${error.message}</div>`;
+                }
             }
         }
     }
@@ -228,8 +239,7 @@
                         quota: det.available_quota,
                         session: `${sess.label} (${sess.start_time.substring(0,5)} - ${sess.end_time.substring(0,5)})`,
                         track: det.label,
-                        date: sess.date,
-                        detailCode: det.session_detail_code
+                        date: sess.date
                     });
                 });
             }
@@ -273,7 +283,7 @@
         applyFilters();
     }
 
-    function processRawData(members) {
+    function processRawData(members, isBackgroundCheck) {
         const grouped = {};
         members.forEach(m => {
             if (!grouped[m.name]) {
@@ -284,24 +294,94 @@
         });
 
         rawData = Object.values(grouped);
+
+        // Periksa perubahan stok jika background monitoring aktif
+        if (isBackgroundCheck) {
+            checkQuotaChangesAndNotify();
+        }
+
         applyFilters();
+    }
+
+    function checkQuotaChangesAndNotify() {
+        const webhookUrl = document.getElementById('discordWebhookInput').value.trim();
+        if (!webhookUrl) return;
+
+        let changesFound = [];
+        rawData.forEach(member => {
+            member.sessions.forEach(sess => {
+                let key = `${member.name}_${sess.session}_${sess.track || 'default'}`;
+                let oldQuota = previousQuotaSnapshot[key] !== undefined ? previousQuotaSnapshot[key] : sess.quota;
+                
+                if (sess.quota > oldQuota) {
+                    changesFound.push(`🟢 **${member.name}** (${sess.session} - ${sess.track || 'Jalur Utama'}): Kuota bertambah dari **${oldQuota}** menjadi **${sess.quota}**!`);
+                }
+                previousQuotaSnapshot[key] = sess.quota;
+            });
+        });
+
+        if (changesFound.length > 0) {
+            sendDiscordNotification(webhookUrl, `🚨 **RESTOCK ALERT 2-SHOT (${currentCategory.toUpperCase()})** 🚨\n\n` + changesFound.join('\n'));
+        }
+    }
+
+    function sendDiscordNotification(url, message) {
+        fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: message })
+        }).catch(err => console.error("Gagal mengirim webhook Discord:", err));
+    }
+
+    function toggleMonitor() {
+        const btn = document.getElementById('btnToggleMonitor');
+        const intervalVal = parseInt(document.getElementById('intervalSelect').value);
+        const webhookUrl = document.getElementById('discordWebhookInput').value.trim();
+
+        if (!isMonitoringActive) {
+            if (!webhookUrl) {
+                alert('Silakan masukkan URL Webhook Discord terlebih dahulu!');
+                return;
+            }
+            if (intervalVal === 0) {
+                alert('Silakan pilih interval waktu pengecekan otomatis!');
+                return;
+            }
+
+            // Inisialisasi snapshot awal
+            rawData.forEach(member => {
+                member.sessions.forEach(sess => {
+                    let key = `${member.name}_${sess.session}_${sess.track || 'default'}`;
+                    previousQuotaSnapshot[key] = sess.quota;
+                });
+            });
+
+            isMonitoringActive = true;
+            btn.className = "btn btn-danger btn-sm w-100 rounded-pill fw-bold";
+            btn.innerText = "Berhenti";
+            document.getElementById('discordWebhookInput').disabled = true;
+            document.getElementById('intervalSelect').disabled = true;
+
+            monitorTimer = setInterval(() => {
+                fetchData(true);
+            }, intervalVal * 1000);
+        } else {
+            isMonitoringActive = false;
+            clearInterval(monitorTimer);
+            btn.className = "btn btn-outline-success btn-sm w-100 rounded-pill fw-bold";
+            btn.innerText = "Mulai";
+            document.getElementById('discordWebhookInput').disabled = false;
+            document.getElementById('intervalSelect').disabled = false;
+        }
     }
 
     function applyFilters() {
         const searchQuery = document.getElementById('searchBox').value.toLowerCase();
         const showAvailableOnly = document.getElementById('availableOnlyToggle').checked;
         const container = document.getElementById('data-container');
-        const announcementContainer = document.getElementById('announcement-container');
-
-        let eligibleForExtra = [];
 
         let filteredData = rawData.filter(member => {
-            if (currentCategory === 'mg' && member.totalQuota === 0 && member.sessions.length < 4) {
-                eligibleForExtra.push(member.name);
-            }
-
             const matchesSearch = member.name.toLowerCase().includes(searchQuery);
-            
             let matchesSession = true;
             let displayedSessions = member.sessions;
 
@@ -316,18 +396,6 @@
             return matchesSearch && matchesSession && matchesAvailability;
         });
 
-        if (currentCategory === 'mg' && eligibleForExtra.length > 0) {
-            announcementContainer.innerHTML = `
-                <div class="alert alert-danger mb-4 mx-auto d-flex align-items-center border-0 shadow-sm" style="max-width: 800px; background-color: #2a1114; color: #f8d7da; border: 1px solid #58151c !important;">
-                    <div class="fs-2 me-3">📢</div>
-                    <div>
-                        <strong class="text-danger fw-bold">Member Berpotensi Mendapat Sesi Tambahan:</strong><br>
-                        <span style="font-size: 0.9rem;">${eligibleForExtra.join(', ')}</span>
-                    </div>
-                </div>
-            `;
-        }
-
         filteredData.sort((a, b) => {
             if (a.totalQuota > 0 && b.totalQuota === 0) return -1;
             if (a.totalQuota === 0 && b.totalQuota > 0) return 1;
@@ -339,9 +407,7 @@
             return;
         }
 
-        let favoriteHtml = '';
-        let regularHtml = '';
-
+        let cardsHtml = '';
         filteredData.forEach(memberData => {
             let sessionsToRender = memberData.sessions;
             if (currentCategory === 'akb_2shot' && selectedSessionFilter !== 'all') {
@@ -350,28 +416,11 @@
 
             const currentFilteredQuota = sessionsToRender.reduce((acc, s) => acc + s.quota, 0);
             const isAvailable = currentFilteredQuota > 0;
-            const isFavorite = favoriteMembers.includes(memberData.name);
-            
             const itemClass = isAvailable ? 'has-tickets' : 'sold-out-item';
-            const specialCardClass = isFavorite && (currentCategory === 'mg' || currentCategory === 'jkt_2shot') ? 'special-card' : '';
-            const specialHeaderClass = isFavorite && (currentCategory === 'mg' || currentCategory === 'jkt_2shot') ? 'special-header' : '';
-            const specialTitleClass = isFavorite && (currentCategory === 'mg' || currentCategory === 'jkt_2shot') ? 'special-title' : 'text-white';
-            
-            const starIcon = isFavorite ? '★' : '☆';
-            const starColor = isFavorite ? '#ffc107' : '#6c757d';
 
             const badgeHtml = isAvailable 
                 ? `<span class="badge bg-success rounded-pill px-3 py-2 shadow-sm">${currentFilteredQuota} Tersedia</span>` 
                 : `<span class="badge bg-secondary rounded-pill px-3 py-2">Sold Out</span>`;
-
-            let extraSessionHtml = '';
-            if (currentCategory === 'mg' && memberData.totalQuota === 0) {
-                if (memberData.sessions.length < 4) {
-                    extraSessionHtml = `<div class="extra-session-banner eligible">🔥 POTENSI SESI TAMBAHAN</div>`;
-                } else {
-                    extraSessionHtml = `<div class="extra-session-banner maxed">🛑 SOLD OUT (MAX 4 SESI)</div>`;
-                }
-            }
 
             let tableRows = '';
             sessionsToRender.forEach(s => {
@@ -389,10 +438,6 @@
                 `;
             });
 
-            const starHtml = currentCategory !== 'akb_2shot' 
-                ? `<span class="fs-4 star-btn" style="color: ${starColor};" onclick="toggleFavorite('${memberData.name}')" title="Tandai sebagai Favorit">${starIcon}</span>`
-                : '';
-
             let buyButtonHtml = '';
             if (currentCategory === 'akb_2shot' && isAvailable) {
                 buyButtonHtml = `
@@ -404,17 +449,13 @@
                 `;
             }
 
-            const cardHtml = `
+            cardsHtml += `
                 <div class="col">
-                    <div class="member-card ${itemClass} ${specialCardClass}">
-                        <div class="card-header-member ${specialHeaderClass}">
-                            <div class="d-flex align-items-center gap-2">
-                                ${starHtml}
-                                <h5 class="m-0 fw-bold ${specialTitleClass}">${memberData.name}</h5>
-                            </div>
+                    <div class="member-card ${itemClass}">
+                        <div class="card-header-member">
+                            <h5 class="m-0 fw-bold text-white">${memberData.name}</h5>
                             ${badgeHtml}
                         </div>
-                        ${extraSessionHtml}
                         <div class="card-body p-0 flex-grow-1">
                             <table class="table table-dark table-sm align-middle mb-2" style="font-size: 0.9rem;">
                                 <thead class="text-muted border-bottom border-secondary" style="font-size: 0.8rem;">
@@ -433,35 +474,12 @@
                     </div>
                 </div>
             `;
-
-            if (isFavorite && currentCategory !== 'akb_2shot') {
-                favoriteHtml += cardHtml;
-            } else {
-                regularHtml += cardHtml;
-            }
         });
 
-        let finalRender = '';
-        if (currentCategory !== 'akb_2shot' && favoriteHtml !== '') {
-            finalRender += `
-                <div class="col-12 mb-3 mt-2">
-                    <h4 class="fw-bold text-warning border-bottom border-warning pb-2 d-inline-block pe-4">⭐ Member Favorit Anda</h4>
-                </div>
-                ${favoriteHtml}`;
-            if (regularHtml !== '') {
-                finalRender += `
-                    <div class="col-12 mb-3 mt-5">
-                        <h4 class="fw-bold text-white border-bottom border-secondary pb-2 d-inline-block pe-4">👥 Member Lainnya</h4>
-                    </div>
-                    ${regularHtml}`;
-            }
-        } else {
-            finalRender = regularHtml;
-        }
-
-        container.innerHTML = `<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">${finalRender}</div>`;
+        container.innerHTML = `<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">${cardsHtml}</div>`;
     }
 
+    // Inisialisasi awal saat halaman dibuka
     fetchData();
 </script>
 
